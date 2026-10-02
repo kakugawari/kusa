@@ -29,12 +29,14 @@ const BASE = 0.94;   // 根元の高さ (箱の上から)
 
 /** 届いたシート。cols x rows のマスに1本ずつ並んでいる */
 const SHEETS = {
-  s1: { file: 'img/source/plants-sheet-01.png', cols: 5, rows: 4 }
+  s1: { file: 'img/source/plants-sheet-01.png', cols: 5, rows: 4 },
+  s2: { file: 'img/source/plants-sheet-02.png', cols: 5, rows: 4 }
 };
 
 /**
  * 草ごとの絵の作り方。cell は [シート, 段 (1〜), 列 (1〜)]。
  *   filter: canvas の filter (色を変える)   glow: まわりににじませる光の色
+ *   clean:  背景の色かぶりを除く強さ (0〜1。白い穂が桃色にかぶった草に)
  *   dots:   光の粒 { n, color }            add: 重ねる別の絵 (組み合わせ) [cell, 横のずれ, 大きさ]
  * 仮のものには note を書く (届いたら差し替える)
  */
@@ -42,28 +44,30 @@ const RECIPES = {
   chibi_shiba: { cell: ['s1', 4, 2] },
   fusafusa_shiba: { cell: ['s1', 1, 1] },
   konmori_shiba: { cell: ['s1', 1, 2] },
-  ougon_shiba: { cell: ['s1', 1, 3], filter: 'sepia(0.85) saturate(2.2) hue-rotate(-12deg) brightness(1.08)', glow: 'rgba(255,205,90,0.6)', note: '仮: 色を変えて作った' },
-  mitsuba: { cell: ['s1', 1, 4] },
-  yotsuba: { cell: ['s1', 1, 5] },
-  itsuba: { cell: ['s1', 2, 1] },
-  kouun_clover: { cell: ['s1', 1, 5], filter: 'saturate(1.25) brightness(1.1)', glow: 'rgba(200,255,150,0.55)', dots: { n: 9, color: '#fff6c0' }, note: '仮: 光らせて作った' },
+  ougon_shiba: { clean: 0.9, filter: 'hue-rotate(12deg) saturate(0.95)', cell: ['s2', 2, 3], glow: 'rgba(255,205,90,0.35)' },
+  mitsuba: { cell: ['s2', 1, 3] },
+  yotsuba: { cell: ['s2', 1, 4] },
+  itsuba: { cell: ['s2', 1, 5] },
+  kouun_clover: { cell: ['s2', 3, 2] },
   tanpopo: { cell: ['s1', 2, 2] },
   watage: { cell: ['s1', 2, 3] },
-  kyodai_tanpopo: { cell: ['s1', 2, 2], add: [[['s1', 2, 3], -0.2, 0.85], [['s1', 2, 2], 0.22, 0.8]], note: '仮: 組み合わせて作った' },
-  susuki: { cell: ['s1', 2, 4] },
-  ooki_susuki: { cell: ['s1', 2, 5] },
-  ougon_susuki: { cell: ['s1', 2, 4], filter: 'sepia(0.85) saturate(2.4) hue-rotate(-14deg) brightness(1.1)', glow: 'rgba(255,200,80,0.5)', note: '仮: 色を変えて作った' },
+  kyodai_tanpopo: { cell: ['s2', 3, 4] },
+  susuki: { clean: 0.9, cell: ['s2', 2, 1] },
+  ooki_susuki: { clean: 0.9, cell: ['s2', 2, 2] },
+  ougon_susuki: { clean: 0.9, filter: 'hue-rotate(12deg) saturate(0.95)', cell: ['s2', 2, 4], glow: 'rgba(255,200,80,0.35)' },
   hikaru_kusa: { cell: ['s1', 4, 5], filter: 'hue-rotate(-75deg) saturate(0.9) brightness(1.05)', glow: 'rgba(150,255,170,0.55)', note: '仮: 色を変えて作った' },
-  hoshi_kusa: { cell: ['s1', 4, 5], filter: 'saturate(0.55) brightness(1.15)', glow: 'rgba(190,210,255,0.6)', dots: { n: 14, color: '#ffffff' }, note: '仮: 色を変えて作った' },
-  gekkou_kusa: { cell: ['s1', 4, 5], glow: 'rgba(120,200,255,0.55)' },
-  niji_kusa: { cell: ['s1', 4, 5], filter: 'hue-rotate(110deg) saturate(1.3)', glow: 'rgba(240,180,255,0.6)', dots: { n: 10, color: '#ffffff' }, note: '仮: 色を変えて作った' },
+  hoshi_kusa: { cell: ['s2', 4, 2] },
+  gekkou_kusa: { cell: ['s2', 4, 3] },
+  niji_kusa: { cell: ['s2', 4, 4] },
   zassou: { cell: ['s1', 4, 3] },
-  mizube_kusa: { cell: ['s1', 1, 1], filter: 'hue-rotate(28deg) saturate(0.85) brightness(0.95)', dots: { n: 10, color: 'rgba(210,240,255,0.95)', drop: true }, note: '仮: 色を変えて作った' },
-  clover_shiba: { cell: ['s1', 4, 2], add: [[['s1', 1, 4], 0.08, 0.72]] },
+  mizube_kusa: { clean: 0.9, cell: ['s2', 2, 5] },
+  clover_shiba: { cell: ['s2', 3, 1] },
   watage_daigunsei: { cell: ['s1', 2, 3], add: [[['s1', 2, 3], -0.2, 0.8], [['s1', 2, 3], 0.22, 0.85]] },
-  ougon_sougen: { cell: ['s1', 1, 3], filter: 'sepia(0.85) saturate(2.2) hue-rotate(-12deg) brightness(1.08)', add: [[['s1', 2, 4], 0.22, 0.9, 'sepia(0.85) saturate(2.4) hue-rotate(-14deg) brightness(1.1)']], glow: 'rgba(255,205,90,0.6)', note: '仮: 色を変えて組み合わせた' },
-  kouun_hikarigusa: { cell: ['s1', 1, 5], filter: 'saturate(1.3) brightness(1.18)', glow: 'rgba(170,255,140,0.75)', dots: { n: 14, color: '#fffbd0' }, note: '仮: 光らせて作った' },
-  hotaru_kusa: { cell: ['s1', 2, 5], filter: 'brightness(0.72) saturate(0.85)', dots: { n: 12, color: '#e4ff80' }, glow: 'rgba(200,255,120,0.35)', note: '仮: 暗くして光の粒を足した' },
+  ougon_sougen: { clean: 0.9, filter: 'hue-rotate(12deg) saturate(0.95)', cell: ['s2', 3, 5], glow: 'rgba(255,205,90,0.4)' },
+  kouun_hikarigusa: { cell: ['s2', 3, 2], filter: 'saturate(1.25) brightness(1.15)', glow: 'rgba(170,255,140,0.75)', dots: { n: 12, color: '#fffbd0' }, note: '仮: 幸運のクローバーを光らせて作った' },
+  hotaru_kusa: { cell: ['s2', 4, 1] },
+  tanpopo_me: { cell: ['s2', 1, 1] },
+  susuki_me: { clean: 0.9, cell: ['s2', 1, 2] },
   hakobe: { cell: ['s1', 4, 1] },
   hinagiku: { cell: ['s1', 3, 1] },
   sumire: { cell: ['s1', 4, 4] },
@@ -71,7 +75,7 @@ const RECIPES = {
   hotokenoza: { cell: ['s1', 3, 2] },
   oobako: { cell: ['s1', 3, 3] },
   gishigishi: { cell: ['s1', 3, 5] },
-  uchuu_kusa: { cell: ['s1', 4, 5], filter: 'hue-rotate(40deg) brightness(0.7) saturate(1.4)', glow: 'rgba(170,130,255,0.75)', dots: { n: 20, color: '#ffffff' }, note: '仮: 色を変えて星を足した' }
+  uchuu_kusa: { cell: ['s2', 4, 5] }
 };
 
 function serve() {
@@ -211,6 +215,24 @@ function buildInPage(args) {
   const load = (src) => new Promise((r) => { const im = new Image(); im.onload = () => r(im); im.src = src; });
   const rng = (seed) => { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
   const PAD = 0.86; // 光をにじませる余白
+  /**
+   * 絵全体の背景の色かぶりを除く (赤と青が緑より強いぶんを k の割合で引く)。
+   * 白いはずの穂が桃色にかぶった草だけに使う。紫や桃色の花の草に使うと花の色まで抜ける
+   */
+  const clean = (im, k) => {
+    const c = document.createElement('canvas');
+    c.width = im.width; c.height = im.height;
+    const x = c.getContext('2d');
+    x.drawImage(im, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height);
+    const p = d.data;
+    for (let i = 0; i < p.length; i += 4) {
+      const m = Math.min(p[i], p[i + 2]) - p[i + 1];
+      if (m > 0) { p[i] -= m * k; p[i + 2] -= m * k; }
+    }
+    x.putImageData(d, 0, 0);
+    return c;
+  };
   return (async () => {
     const out = {};
     const contact = [];
@@ -220,7 +242,8 @@ function buildInPage(args) {
       const x = c.getContext('2d');
       const layers = [[r.cell, 0, 1, r.filter]].concat(r.add || []);
       // いちばん大きい絵に合わせて、全体の大きさを決める
-      const ims = await Promise.all(layers.map((l) => load(cells[l[0][0] + ':' + l[0][1] + '-' + l[0][2]])));
+      let ims = await Promise.all(layers.map((l) => load(cells[l[0][0] + ':' + l[0][1] + '-' + l[0][2]])));
+      if (r.clean) ims = ims.map((im) => clean(im, r.clean));
       const base = ims[0];
       // 組み合わせは横に広がるので、全体が箱に収まるように縮める
       const fit = Math.min((OUT_W * PAD) / base.width, (OUT_H * (BASE - 0.05) * PAD) / base.height);
