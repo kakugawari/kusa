@@ -138,6 +138,20 @@ async function run() {
     ok(safe.plantBottom <= safe.h - 34, `安全域を入れても「種をまく」が画面に収まる (下端 ${Math.round(safe.plantBottom)} / ${safe.h - 34})`);
     ok(safe.boardBottom <= safe.msgTop, `案内の札が、下の木の板に重ならない (${Math.round(safe.boardBottom)} <= ${Math.round(safe.msgTop)})`);
 
+    // Safari で開くと 100vh はツールバーを隠した高さ (932) で、見えているのは 739 ほど。
+    // 画面を 100vh で作っていたときは、下の板が見えない所 (928) まではみ出した。932 の根っこを差し込んで確かめる
+    {
+      const ctx2 = await browser.newContext({ ...PHONE, viewport: { width: 430, height: 739 } });
+      const sp = await ctx2.newPage();
+      await sp.goto(URL);
+      await sp.waitForFunction(() => window.__app);
+      await sp.addStyleTag({ content: 'html, body { height: 932px !important; }' });
+      await sp.waitForTimeout(150);
+      const r = await sp.evaluate(() => ({ bar: document.getElementById('actions').getBoundingClientRect().bottom, h: innerHeight }));
+      ok(r.bar <= r.h, `Safari のツールバーが出ていても、下の板が見えている所に収まる (下端 ${Math.round(r.bar)} / ${r.h})`);
+      await ctx2.close();
+    }
+
     // ------------------------------------------------ kusa の操作
     const ID = (name) => phone.evaluate((n) => window.Core.findByName(n).id, name);
     const chibi = await ID('ちび芝生');

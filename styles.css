@@ -38,7 +38,8 @@ html, body {
 }
 
 body {
-  background: var(--linen);
+  /* 時計の帯の下や、写真の外に見える地の色。地面に合う焦げ茶 */
+  background: #3a2e1c;
   color: var(--ink);
   font-family: var(--font-ui);
   -webkit-text-size-adjust: 100%;
@@ -52,11 +53,13 @@ button:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; }
 
 
 html, body { height: 100vh; position: relative; }
+/* Safari で開くと 100vh はツールバーを隠したときの高さ (932) で、見えている所より長い。
+ * 画面そのもの (#app) は「いま見えている高さ」(100dvh) に合わせ、下の板が切れないようにする */
 #app {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 100dvh;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
 
@@ -577,3 +580,5 @@ html, body { height: 100vh; position: relative; }
 @media (prefers-reduced-motion: reduce) {
   .speck { animation: none; opacity: 0; }
 }
+
+.version { margin: 0; padding: 6px 16px calc(8px + env(safe-area-inset-bottom)); font-size: 10px; color: var(--ink-soft); text-align: center; font-variant-numeric: tabular-nums; }

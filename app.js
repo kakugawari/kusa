@@ -10,6 +10,7 @@
 
   const C = window.Core;
   const SAVE_KEY = 'kusa.save.v1';
+  const VERSION = '2026-10-02b'; // 直したら上げる。実機で「届いているか」を確かめるため、図鑑のいちばん下に出す
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -720,6 +721,7 @@
   }
 
   function main() {
+    document.getElementById('version').textContent = '版 ' + VERSION + ' / 見えている高さ ' + window.innerHeight;
     window.addEventListener('resize', placeAll);
     // 書体の読み込みなどで台の位置が動いたら、草を置き直す (ずれると草が根元から浮く)
     if (window.ResizeObserver) new ResizeObserver(() => placeAll()).observe(els.stage);
