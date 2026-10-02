@@ -56,30 +56,30 @@
   /** 系統: 同じ草を2つ重ねると、並びの次の草に進化する。 */
   const LINEAGES = [
     { id: 'shiba', name: '芝生', stages: [
-      ['ちび芝生', 0, '小さな草の芽。初めて牧場に生えた草。'],
-      ['ふさふさ芝生', 0, '葉が増えて丸くなる。'],
-      ['こんもり芝生', 1, '大きな緑のかたまり。'],
-      ['黄金芝生', 2, '金色の穂が生える珍しい芝生。']
+      ['chibi_shiba', 'ちび芝生', 0, '小さな草の芽。初めて牧場に生えた草。'],
+      ['fusafusa_shiba', 'ふさふさ芝生', 0, '葉が増えて丸くなる。'],
+      ['konmori_shiba', 'こんもり芝生', 1, '大きな緑のかたまり。'],
+      ['ougon_shiba', '黄金芝生', 2, '金色の穂が生える珍しい芝生。']
     ] },
     { id: 'clover', name: 'クローバー', stages: [
-      ['三つ葉', 0, ''], ['四つ葉', 1, ''], ['五つ葉', 2, ''], ['幸運のクローバー', 2, '']
+      ['mitsuba', '三つ葉', 0, ''], ['yotsuba', '四つ葉', 1, ''], ['itsuba', '五つ葉', 2, ''], ['kouun_clover', '幸運のクローバー', 2, '']
     ] },
     { id: 'tanpopo', name: 'タンポポ', stages: [
-      ['芽', 0, ''], ['タンポポ', 1, ''], ['綿毛', 2, ''], ['巨大タンポポ', 2, '']
+      ['tanpopo_me', '芽', 0, ''], ['tanpopo', 'タンポポ', 1, ''], ['watage', '綿毛', 2, ''], ['kyodai_tanpopo', '巨大タンポポ', 2, '']
     ] },
     { id: 'susuki', name: 'ススキ', stages: [
-      ['芽', 0, ''], ['ススキ', 1, ''], ['大きなススキ', 2, ''], ['黄金のススキ', 2, '']
+      ['susuki_me', '芽', 0, ''], ['susuki', 'ススキ', 1, ''], ['ooki_susuki', '大きなススキ', 2, ''], ['ougon_susuki', '黄金のススキ', 2, '']
     ] },
     { id: 'gensou', name: '幻想草', stages: [
-      ['光る草', 2, ''], ['星の草', 3, ''], ['月光草', 3, ''], ['虹の草', 3, '']
+      ['hikaru_kusa', '光る草', 2, ''], ['hoshi_kusa', '星の草', 3, ''], ['gekkou_kusa', '月光草', 3, ''], ['niji_kusa', '虹の草', 3, '']
     ] }
   ];
 
   /** 系統に入らない草 (特殊合成の入口・出口)。 */
   const EXTRAS = [
-    ['雑草', 0, ''], ['水辺の草', 0, ''],
-    ['クローバー芝生', 1, ''], ['綿毛の大群生', 2, ''], ['黄金の草原', 3, ''],
-    ['幸運の光草', 3, ''], ['ホタル草', 2, ''], ['宇宙草', 4, '']
+    ['zassou', '雑草', 0, ''], ['mizube_kusa', '水辺の草', 0, ''],
+    ['clover_shiba', 'クローバー芝生', 1, ''], ['watage_daigunsei', '綿毛の大群生', 2, ''], ['ougon_sougen', '黄金の草原', 3, ''],
+    ['kouun_hikarigusa', '幸運の光草', 3, ''], ['hotaru_kusa', 'ホタル草', 2, ''], ['uchuu_kusa', '宇宙草', 4, '']
   ];
 
   /**
@@ -109,27 +109,28 @@
   ];
 
   // ---- コイン (値段はすべて仮) ----------------------------------------
-  // 草の値段 = レア度の基本 x 段。売るときはその半分。
-  // 種を買う値段 = 草の値段 (買った草を重ねて育てるより、買うほうが得にならない)。
+  // 草の値段 = レア度の基本 x 段。売るときはその半分。種を買う値段 = 草の値段。
+  // 釣り合いはまだ取れていない (CLAUDE.md の「仮置き・未決」)。
   const BASE_PRICE = [10, 30, 100, 300, 1000];
   const LAND_PRICE = [0, 300, 1500, 8000]; // 牧場 step 番目へ広げる値段 (0 番目は最初から)
   const START_COINS = 30;
 
-  // 名前の重複 (芽は2系統) を避けるため、id は「系統:段」にする。
-  // 名前で引くときは findByName (同名は最初の系統が優先)。
+  // id は草ごとに手で決めた固定の文字列。保存データと図鑑の記録はこの id で持つので、
+  // 並び順や段を足し替えても変わらないようにする (200種・300種へ増やすときに記録が壊れない)。
+  // 名前は重なることがある (芽は2系統)。名前で引くときは findByName (同名は最初の系統が優先)。
   function buildSpecies() {
     const list = [];
     LINEAGES.forEach(function (l) {
       l.stages.forEach(function (s, i) {
         list.push({
-          id: l.id + ':' + (i + 1), name: s[0], lineage: l.id, level: i + 1,
-          rarity: s[1], note: s[2],
-          next: i + 1 < l.stages.length ? l.id + ':' + (i + 2) : null
+          id: s[0], name: s[1], lineage: l.id, level: i + 1,
+          rarity: s[2], note: s[3],
+          next: i + 1 < l.stages.length ? l.stages[i + 1][0] : null
         });
       });
     });
-    EXTRAS.forEach(function (s, i) {
-      list.push({ id: 'x:' + (i + 1), name: s[0], lineage: null, level: 1, rarity: s[1], note: s[2], next: null });
+    EXTRAS.forEach(function (s) {
+      list.push({ id: s[0], name: s[1], lineage: null, level: 1, rarity: s[2], note: s[3], next: null });
     });
     return list;
   }

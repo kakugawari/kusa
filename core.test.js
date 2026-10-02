@@ -41,7 +41,7 @@ test('系統のいちばん上は、同じ草でもこれ以上進化しない',
 
 test('どの系統も、全段を順にたどって最後まで進化できる', () => {
   Core.LINEAGES.forEach((l) => {
-    let cur = l.id + ':1';
+    let cur = l.stages[0][0];
     for (let i = 1; i < l.stages.length; i++) {
       const r = Core.merge(cur, cur);
       assert.ok(r, `${l.name} の ${i} 段で止まった`);
@@ -65,6 +65,11 @@ test('レシピに無い組は合成できない', () => {
 
 test('名前で引くレシピの草が、すべて存在する', () => {
   Core.RECIPES.forEach((r) => r.forEach((n) => assert.ok(Core.findByName(n), `${n} が無い`)));
+});
+
+test('草の id は固定の文字列で、名前や並びから作っていない', () => {
+  assert.strictEqual(id('ちび芝生'), 'chibi_shiba');
+  Core.SPECIES.forEach((s) => assert.match(s.id, /^[a-z_]+$/, s.name));
 });
 
 test('草の id は重ならず、レア度は表の範囲に収まる', () => {
