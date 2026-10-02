@@ -7,33 +7,50 @@
 <meta name="description" content="草の図鑑・合成ゲーム">
 <meta name="theme-color" content="#e9eedb">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
 
+<canvas id="backdrop" aria-hidden="true"></canvas>
 <div id="app">
   <header id="topbar">
-    <h1 class="title">kusa</h1>
-    <button type="button" id="btnBook" class="pill" aria-label="図鑑を開く">
-      <span class="pill-label">図鑑</span> <span id="bookCount">0 / 0</span> 種
+    <h1 class="title">
+      <svg class="logo-sprout" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21v-8.5" /><path d="M12 13c-.6-3.8-3.6-6-7.6-5.8.2 4 2.9 6.2 7.6 5.8z" /><path d="M12 11.2c.4-3.4 3-5.6 7-5.6-.1 3.6-2.6 5.8-7 5.6z" /></svg>
+      <span class="title-word">kusa</span>
+    </h1>
+    <button type="button" id="btnBook" class="chip chip-book" aria-label="図鑑を開く">
+      <svg class="chip-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h10.5a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z" /><path d="M5 17a3 3 0 0 1 3-3h10.5" /><path d="M10.5 11.5c0-2.2 1.4-3.6 3.6-3.8 0 2.2-1.4 3.7-3.6 3.8z" /></svg>
+      <span class="chip-text"><span id="bookCount">0 / 0</span><span class="chip-unit">種</span></span>
+      <span class="meter" aria-hidden="true"><i id="bookMeter"></i></span>
     </button>
-    <span class="coins" aria-label="コイン"><span class="coin-dot"></span><span id="coins">0</span></span>
+    <span class="chip chip-coin" aria-label="コイン"><span class="coin-dot" aria-hidden="true"></span><span id="coins">0</span></span>
   </header>
 
   <main id="stage">
     <div id="diorama">
       <div id="slab">
-        <canvas id="soil" width="760" height="1200" aria-hidden="true"></canvas>
+        <canvas id="soil" width="760" height="1360" aria-hidden="true"></canvas>
         <div id="board" role="grid" aria-label="牧場"></div>
-        <div class="slab-front" aria-hidden="true"></div>
+        <div class="slab-front" aria-hidden="true"><canvas id="strata" width="760" height="220"></canvas></div>
       </div>
     </div>
+    <div id="plants"></div>
+    <div id="air" aria-hidden="true"></div>
     <p id="message" class="message" aria-live="polite">種をまいて、同じ草を重ねてみよう。</p>
   </main>
 
   <footer id="actions">
-    <button type="button" id="btnSell" class="btn btn-sell">売る</button>
-    <button type="button" id="btnPlant" class="btn btn-primary">種をまく</button>
+    <button type="button" id="btnSell" class="btn btn-sell">
+      <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16l-1.6 8.4a2 2 0 0 1-2 1.6H7.6a2 2 0 0 1-2-1.6z" /><path d="M8.5 10 11 4.5M15.5 10 13 4.5" /><path d="M9.5 14v2.5M14.5 14v2.5" /></svg>
+      <span>売る</span>
+    </button>
+    <button type="button" id="btnPlant" class="btn btn-primary">
+      <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5v-7" /><path d="M12 13.5c-.4-3.4-2.9-5.4-6.4-5.3.1 3.5 2.5 5.4 6.4 5.3z" /><path d="M12 12c.3-3 2.6-4.9 6-4.9-.1 3.1-2.3 5-6 4.9z" /><path d="M7.5 20.5h9" /></svg>
+      <span>種をまく</span>
+    </button>
   </footer>
 </div>
 

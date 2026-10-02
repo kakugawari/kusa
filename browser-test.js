@@ -104,7 +104,14 @@ async function run() {
     const context = await browser.newContext({ ...PHONE });
     const phone = await context.newPage();
     phone.on('pageerror', (e) => errors.push('スマホ: ' + e.message));
-    phone.on('console', (m) => { if (m.type() === 'error') errors.push('スマホ: ' + m.text()); });
+    // 外部の書体 (Google Fonts) が読めない環境もある。読めなくても端末の書体で出るので、その失敗だけは数えない
+    const fontHost = /fonts\.(googleapis|gstatic)\.com/;
+    phone.on('requestfailed', () => {});
+    phone.on('console', (m) => {
+      if (m.type() !== 'error') return;
+      if (fontHost.test((m.location() && m.location().url) || '')) return;
+      errors.push('スマホ: ' + m.text());
+    });
     await phone.goto(URL);
     await phone.waitForFunction(() => window.__app);
     ok(true, 'ページが開いて、画面のしくみが立ち上がる');
@@ -148,7 +155,12 @@ async function run() {
       const r = await phone.locator(sel).boundingBox();
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     }
-    const cellSel = (i) => `#board .cell:nth-child(${i + 1})`;
+    const cellSel = (i) => `#board .cell:nth-child(${i + 1}) .ground`; // マスの根元 (土の面)
+    /** マスを指で押す。草の絵が上に重なっているので、要素ではなく画面の位置 (根元) を押す */
+    async function tap(i) {
+      const p = await center(cellSel(i));
+      await phone.mouse.click(p.x, p.y);
+    }
     async function idle() { await phone.waitForFunction(() => !window.__app.busy()); }
     async function closeDiscover() {
       if (await phone.locator('#discover').isVisible()) {
@@ -210,9 +222,9 @@ async function run() {
 
     section('タップで合成');
     await setup({ 2: chibi, 9: chibi });
-    await phone.locator(cellSel(2)).click();
+    await tap(2);
     ok(await phone.evaluate(() => window.__app.selected()) === 2, '1回目のタップで選ぶ');
-    await phone.locator(cellSel(9)).click();
+    await tap(9);
     await phone.locator('#discover').waitFor({ state: 'visible' });
     g = await phone.evaluate(() => window.__app.game().cells.slice());
     ok(g[2] === null && g[9] === fusa, '2回目のタップで重なる');
@@ -234,7 +246,7 @@ async function run() {
     ok(sold.cell === null && sold.coins > coins0, `「売る」へ運ぶとコインになる (${coins0} → ${sold.coins})`);
     ok(sold.found[fusa] === true, '売っても図鑑の発見記録は消えない');
     await setup({ 6: chibi });
-    await phone.locator(cellSel(6)).click();
+    await tap(6);
     await phone.locator('#btnSell').click();
     await idle();
     ok(await phone.evaluate(() => window.__app.game().cells[6]) === null, '選んでから「売る」を押しても売れる');
@@ -263,7 +275,7 @@ async function run() {
     await setup(Object.fromEntries(Array.from({ length: 16 }, (_, i) => [i, tall[i % 4]])));
     await phone.waitForTimeout(150);
     const look = await phone.evaluate(() => {
-      const imgs = [...document.querySelectorAll('#board .plant')];
+      const imgs = [...document.querySelectorAll('#plants .plant')];
       return {
         count: imgs.length,
         allImg: imgs.every((i) => i.tagName === 'IMG' && i.complete && i.naturalWidth > 0),
@@ -299,14 +311,14 @@ async function run() {
     const through = await phone.evaluate(() => {
       const ground = document.querySelectorAll('#board .ground')[1].getBoundingClientRect();
       // 奥のマス (1) の根元の少し上を、手前の草 (5) の絵の箱が覆っているかを探す
-      const front = document.querySelectorAll('#board .plant')[5].getBoundingClientRect();
+      const front = document.querySelectorAll('#plants .plant')[5].getBoundingClientRect();
       return { covered: ground.bottom > front.top, x: ground.left + ground.width / 2, y: ground.top + ground.height * 0.75 };
     });
     ok(through.covered, '手前の草の絵の箱が、奥のマスの根元に重なっている (見張りの前提)');
 
     // 手前の草の葉の上 (根元ではない所) を押すと、手前の草が選ばれる
     const leafHit = await phone.evaluate(() => {
-      const img = document.querySelectorAll('#board .plant')[5];
+      const img = document.querySelectorAll('#plants .plant')[5];
       const r = img.getBoundingClientRect();
       const cell = document.querySelectorAll('#board .cell')[5].getBoundingClientRect();
       // 草の真ん中の縦の線をたどり、根元より上で、そのマスの上半分にある点を探す
@@ -347,7 +359,7 @@ async function run() {
       const soil = document.getElementById('soil').getBoundingClientRect();
       const front = document.querySelector('.slab-front').getBoundingClientRect();
       const msg = document.getElementById('message').getBoundingClientRect();
-      const plants = [...document.querySelectorAll('#board .plant')].map((e) => e.getBoundingClientRect());
+      const plants = [...document.querySelectorAll('#plants .plant')].map((e) => e.getBoundingClientRect());
       return { left: soil.left, right: soil.right, frontBottom: front.bottom, msgTop: msg.top,
         boardH: soil.height, plantW: Math.max(...plants.map((p) => p.width)) };
     });
@@ -362,7 +374,7 @@ async function run() {
     // 飾りの草や苔は、合成用の草の根元 (各マス) に置かない。合成する草と見まちがえないため
     const decor = await phone.evaluate(() => {
       const c = document.createElement('canvas');
-      c.width = 760; c.height = 1200;
+      c.width = 760; c.height = 1360;
       window.KusaArt.soil(c, 7, { cols: 4, rows: 4, baseY: 0.78 });
       const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
       const cw = c.width / 4, ch = c.height / 4;
@@ -400,6 +412,30 @@ async function run() {
     const hs = await phone.evaluate(() => [0, 1].map((i) => document.querySelectorAll('#board .ground')[i]).map((g) => getComputedStyle(g, '::before').width).map(parseFloat));
     ok(hs[1] > hs[0] * 1.1, `背の高い草ほど影が長い (${Math.round(hs[0])} → ${Math.round(hs[1])}px)`);
 
+    section('奥の列の草が見えている');
+    // 3D の台の中で草を動かすと、奥の列の草が土の後ろに回って消えた。
+    // 奥の列の草を、出した画面と隠した画面で撮り比べ、画素が変わる (= 見えている) ことを確かめる
+    await setup({ 0: chibi, 1: fusa, 2: mitsu, 3: fusa, 5: fusa, 9: chibi });
+    await phone.waitForTimeout(300);
+    const backVisible = [];
+    for (const k of [0, 1, 2, 3]) {
+      const box = await phone.evaluate((i) => { const r = document.querySelectorAll('#plants .sprite')[i].getBoundingClientRect(); return { x: r.left, y: r.top + r.height * 0.45, width: r.width, height: r.height * 0.5 }; }, k);
+      const shown = await phone.screenshot({ clip: box });
+      await phone.evaluate((i) => { document.querySelectorAll('#plants .sprite')[i].style.visibility = 'hidden'; }, k);
+      const hidden = await phone.screenshot({ clip: box });
+      await phone.evaluate((i) => { document.querySelectorAll('#plants .sprite')[i].style.visibility = ''; }, k);
+      const diff = await phone.evaluate(async ([a, b]) => {
+        const load = async (s) => { const im = new Image(); im.src = 'data:image/png;base64,' + s; await im.decode(); const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0); return x.getImageData(0, 0, c.width, c.height).data; };
+        const p = await load(a), q = await load(b);
+        let n = 0;
+        for (let i = 0; i < p.length; i += 4) if (Math.abs(p[i] - q[i]) + Math.abs(p[i + 1] - q[i + 1]) + Math.abs(p[i + 2] - q[i + 2]) > 30) n++;
+        return n / (p.length / 4);
+      }, [shown.toString('base64'), hidden.toString('base64')]);
+      backVisible.push(Math.round(diff * 100));
+    }
+    ok(backVisible.every((d) => d >= 2), `奥の列の草が、どれも画面に写っている (草が占める割合 ${backVisible.join(' / ')} %)`);
+    ok(await phone.evaluate(() => !document.querySelector('#slab .plant')), '草は 3D の台の中に置いていない');
+
     section('合成の演出');
     await setup({ 4: chibi, 8: mitsu });
     await drag(cellSel(4), cellSel(8));
@@ -408,8 +444,8 @@ async function run() {
     await closeDiscover();
     const left = await phone.evaluate(() => ({
       fx: document.querySelectorAll('.leaf, .dirt, .mote, .halo, .ghost').length,
-      shown: getComputedStyle(document.querySelectorAll('#board .plant')[0] || document.body).opacity,
-      plantOpacity: [...document.querySelectorAll('#board .plant')].map((p) => getComputedStyle(p).opacity)
+      shown: getComputedStyle(document.querySelectorAll('#plants .plant')[0] || document.body).opacity,
+      plantOpacity: [...document.querySelectorAll('#plants .plant')].map((p) => getComputedStyle(p).opacity)
     }));
     ok(left.fx === 0, `演出が終わると、葉・土・光の粒が残らない (${left.fx})`);
     ok(left.plantOpacity.length === 1 && left.plantOpacity[0] === '1', '生えた草が見えている (隠したままにならない)');

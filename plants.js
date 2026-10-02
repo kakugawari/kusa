@@ -861,9 +861,11 @@
     const tuftKinds = [
       { c0: '#4a5a2a', c1: '#8a9a52', n: 7, l: 12 },  // 細い若草
       { c0: '#5a5a30', c1: '#a59a5a', n: 5, l: 10 },  // 枯れかけた草
-      { c0: '#3e5a2e', c1: '#6f8f4a', n: 4, l: 7, round: true } // 小さな丸葉
+      { c0: '#3e5a2e', c1: '#6f8f4a', n: 4, l: 7, round: true }, // 小さな丸葉
+      { c0: '#4a5a2a', c1: '#8a9a52', n: 6, l: 11, flower: '#f4f1e4' }, // 白い小花の混じる草
+      { c0: '#4a5a2a', c1: '#8a9a52', n: 6, l: 11, flower: '#e9c94a' }  // 黄色い小花の混じる草
     ];
-    const groups = 9;
+    const groups = 14;
     for (let gI = 0; gI < groups; gI++) {
       const kind = tuftKinds[Math.floor(rng() * tuftKinds.length)];
       const center = spot(1.15);
@@ -898,6 +900,34 @@
   }
 
   function drawTuft(ctx, x, y, kind, rng) {
+    if (kind.flower && rng() < 0.6) {
+      drawTuftBlades(ctx, x, y, kind, rng);
+      // 小さな花 (地面すれすれに、数輪)
+      for (let f = 0; f < 1 + Math.floor(rng() * 3); f++) {
+        const fx = x + (rng() - 0.5) * kind.l * 1.2;
+        const fy = y - rng() * kind.l * 0.5;
+        ctx.fillStyle = 'rgba(15,8,3,0.25)';
+        ctx.beginPath();
+        ctx.arc(fx + 1.5, fy + 1.5, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = kind.flower;
+        for (let k = 0; k < 5; k++) {
+          const a = (k / 5) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.arc(fx + Math.cos(a) * 1.8, fy + Math.sin(a) * 1.3, 1.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#d9a52b';
+        ctx.beginPath();
+        ctx.arc(fx, fy, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return;
+    }
+    drawTuftBlades(ctx, x, y, kind, rng);
+  }
+
+  function drawTuftBlades(ctx, x, y, kind, rng) {
     // 影 (光と反対の右手前へ)
     ctx.fillStyle = 'rgba(15,8,3,0.22)';
     ctx.beginPath();
@@ -978,5 +1008,133 @@
     ctx.restore();
   }
 
-  root.KusaArt = { url: url, opaqueAt: opaqueAt, heightOf: heightOf, lookOf: lookOf, glow: glow, leafColor: leafColor, soil: soil, drawPlant: drawPlant, W: W, H: H };
+
+  // ---- 机の麻布と朝の光 (背景) ----
+  /** 麻布の織り目、左上から差す朝の光、四隅へ落ちる暗がり。動かないので1回だけ (大きさが変わったら描き直す)。 */
+  function linen(canvas, cssW, cssH, scale) {
+    const k = scale || 1;
+    canvas.width = Math.round(cssW * k);
+    canvas.height = Math.round(cssH * k);
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    const rng = rngFor(91);
+    ctx.fillStyle = '#ebe3cf';
+    ctx.fillRect(0, 0, w, h);
+    // 大きなむら (布のたるみ)
+    const n = noise2(5);
+    const small = makeCanvas(Math.ceil(w / 8), Math.ceil(h / 8));
+    const sc = small.getContext('2d');
+    const im = sc.createImageData(small.width, small.height);
+    for (let y = 0; y < small.height; y++) {
+      for (let x = 0; x < small.width; x++) {
+        const v = n(x / 9, y / 9) - 0.5;
+        const p = (y * small.width + x) * 4;
+        im.data[p] = 236 + v * 14;
+        im.data[p + 1] = 227 + v * 14;
+        im.data[p + 2] = 206 + v * 12;
+        im.data[p + 3] = 255;
+      }
+    }
+    sc.putImageData(im, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(small, 0, 0, w, h);
+    // 織り目: 細い縦糸と横糸 (濃さを少しずつ変える)
+    for (let y = 0; y < h; y += 2 * k) {
+      ctx.fillStyle = 'rgba(110,90,55,' + (0.025 + rng() * 0.035).toFixed(3) + ')';
+      ctx.fillRect(0, y, w, k * 0.8);
+    }
+    for (let x = 0; x < w; x += 2 * k) {
+      ctx.fillStyle = 'rgba(255,255,245,' + (0.02 + rng() * 0.04).toFixed(3) + ')';
+      ctx.fillRect(x, 0, k * 0.8, h);
+    }
+    // 糸のふし
+    for (let i = 0; i < w * h / (900 * k * k); i++) {
+      ctx.fillStyle = 'rgba(120,95,55,' + (0.05 + rng() * 0.08).toFixed(3) + ')';
+      ctx.fillRect(rng() * w, rng() * h, (2 + rng() * 6) * k, k);
+    }
+    // 朝の光 (左上) と、四隅の暗がり
+    const light = ctx.createRadialGradient(w * 0.15, h * 0.05, 0, w * 0.15, h * 0.05, Math.max(w, h) * 0.9);
+    light.addColorStop(0, 'rgba(255,248,226,0.65)');
+    light.addColorStop(0.5, 'rgba(255,248,226,0.12)');
+    light.addColorStop(1, 'rgba(255,248,226,0)');
+    ctx.fillStyle = light;
+    ctx.fillRect(0, 0, w, h);
+    const vig = ctx.createRadialGradient(w * 0.5, h * 0.45, Math.min(w, h) * 0.35, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
+    vig.addColorStop(0, 'rgba(60,45,20,0)');
+    vig.addColorStop(1, 'rgba(60,45,20,0.22)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // ---- 台の切り口 ----
+  /** 台の手前の切り口: 表土・粘土・砂利の層、細い根、埋まった小石。光は左から。 */
+  function strata(canvas) {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    const rng = rngFor(29);
+    const n = noise2(17);
+    // 層の境目は波打たせる
+    const bands = [
+      { top: 0, color: [58, 40, 26] },     // 表土 (黒っぽい)
+      { top: 0.26, color: [86, 62, 40] },  // 粘土まじり
+      { top: 0.58, color: [110, 86, 58] }, // 砂
+      { top: 0.8, color: [70, 52, 36] }    // 下の層
+    ];
+    for (let x = 0; x < w; x += 2) {
+      for (let b = 0; b < bands.length; b++) {
+        const t0 = b === 0 ? 0 : bands[b].top * h + (n(x / 40, b * 3) - 0.5) * h * 0.14;
+        const t1 = b === bands.length - 1 ? h : bands[b + 1].top * h + (n(x / 40, (b + 1) * 3) - 0.5) * h * 0.14;
+        const v = (n(x / 9, b * 7 + 1) - 0.5) * 18;
+        const lit = 1.12 - (x / w) * 0.3; // 左ほど明るい
+        const c = bands[b].color;
+        ctx.fillStyle = 'rgb(' + Math.round((c[0] + v) * lit) + ',' + Math.round((c[1] + v * 0.8) * lit) + ',' + Math.round((c[2] + v * 0.6) * lit) + ')';
+        ctx.fillRect(x, t0, 2, t1 - t0);
+      }
+    }
+    // 細い根: 上から垂れて、くねる
+    for (let i = 0; i < 26; i++) {
+      let x = rng() * w;
+      let y = 0;
+      const len = h * (0.25 + rng() * 0.6);
+      ctx.strokeStyle = 'rgba(214,190,150,' + (0.25 + rng() * 0.35).toFixed(2) + ')';
+      ctx.lineWidth = 0.8 + rng() * 1.4;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      while (y < len) {
+        x += (rng() - 0.5) * 8;
+        y += 4 + rng() * 6;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    // 埋まった小石
+    for (let i = 0; i < 40; i++) {
+      const x = rng() * w;
+      const y = h * (0.3 + rng() * 0.65);
+      const r = 2 + Math.pow(rng(), 2) * 9;
+      const g0 = 110 + rng() * 60;
+      const g = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, 0, x, y, r);
+      g.addColorStop(0, 'rgb(' + Math.round(g0 + 40) + ',' + Math.round(g0 + 34) + ',' + Math.round(g0 + 26) + ')');
+      g.addColorStop(1, 'rgb(' + Math.round(g0 * 0.55) + ',' + Math.round(g0 * 0.5) + ',' + Math.round(g0 * 0.45) + ')');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r * 1.2, r * 0.85, rng(), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // 上のふち: 表土の上面が光を受ける細い明るい線と、下へ向かう影
+    const top = ctx.createLinearGradient(0, 0, 0, h * 0.22);
+    top.addColorStop(0, 'rgba(255,230,190,0.28)');
+    top.addColorStop(1, 'rgba(255,230,190,0)');
+    ctx.fillStyle = top;
+    ctx.fillRect(0, 0, w, h * 0.22);
+    const bottom = ctx.createLinearGradient(0, h * 0.5, 0, h);
+    bottom.addColorStop(0, 'rgba(0,0,0,0)');
+    bottom.addColorStop(1, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = bottom;
+    ctx.fillRect(0, h * 0.5, w, h * 0.5);
+  }
+
+  root.KusaArt = { url: url, opaqueAt: opaqueAt, heightOf: heightOf, lookOf: lookOf, glow: glow, leafColor: leafColor, soil: soil, linen: linen, strata: strata, drawPlant: drawPlant, W: W, H: H };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

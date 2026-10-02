@@ -13,7 +13,7 @@
 
   const $ = (id) => document.getElementById(id);
   const els = {
-    board: $('board'), message: $('message'), coins: $('coins'), bookCount: $('bookCount'),
+    board: $('board'), plants: $('plants'), stage: $('stage'), message: $('message'), coins: $('coins'), bookCount: $('bookCount'), bookMeter: $('bookMeter'),
     btnPlant: $('btnPlant'), btnSell: $('btnSell'), btnBook: $('btnBook'),
     discover: $('discover'), discoverArt: $('discoverArt'), discoverNo: $('discoverNo'),
     discoverName: $('discoverName'), discoverRarity: $('discoverRarity'), discoverKicker: $('discoverKicker'),
@@ -27,6 +27,7 @@
   let busy = false;       // 演出の最中は操作を受けない
   let group = 'lineage';  // 図鑑の並べ方
   const shown = [];       // マスごとに、いま描いている草の id (変わったマスだけ描き直す)
+  const sprites = [];     // マスごとの草の絵 (#plants の層に置く)
 
   // ---- 保存 (まとめて書く。操作ごとに同期で書かない) ----
   let saveTimer = 0;
@@ -71,7 +72,9 @@
     els.board.style.gridTemplateColumns = 'repeat(' + size + ', 1fr)';
     els.board.style.gridTemplateRows = 'repeat(' + size + ', 1fr)';
     els.board.textContent = '';
+    els.plants.textContent = '';
     shown.length = 0;
+    sprites.length = 0;
     for (let i = 0; i < size * size; i++) {
       const cell = document.createElement('div');
       cell.className = 'cell';
@@ -85,11 +88,13 @@
       cell.appendChild(mark);
       els.board.appendChild(cell);
       shown.push(undefined);
+      sprites.push(null);
     }
   }
 
   function cellEl(i) { return els.board.children[i]; }
-  function plantEl(i) { return cellEl(i).querySelector('.plant'); }
+  function spriteEl(i) { return sprites[i] || null; }
+  function plantEl(i) { const sp = sprites[i]; return sp ? sp.firstChild : null; }
   function groundEl(i) { return cellEl(i).querySelector('.ground'); }
 
   function renderCell(i) {
@@ -97,8 +102,7 @@
     if (shown[i] === id) return;
     shown[i] = id;
     const cell = cellEl(i);
-    const old = cell.querySelector('.stand');
-    if (old) old.remove();
+    if (sprites[i]) { sprites[i].remove(); sprites[i] = null; }
     cell.classList.toggle('has', !!id);
     cell.classList.remove('glows');
     cell.removeAttribute('aria-label');
@@ -107,11 +111,53 @@
     cell.style.setProperty('--h', window.KusaArt.heightOf(s).toFixed(2));
     const glow = window.KusaArt.glow(s);
     if (glow) { cell.classList.add('glows'); cell.style.setProperty('--glow', glow); }
-    const stand = document.createElement('div');
-    stand.className = 'stand';
-    stand.appendChild(plantImg(id, 'plant'));
-    cell.appendChild(stand);
+    // そよぎ方を草ごとに少しずつ変える (そろうと作り物に見える)。背の高い草ほど大きく揺れる
+    const h = window.KusaArt.heightOf(s);
+    cell.style.setProperty('--sway-d', (4.2 + ((i * 7) % 5) * 0.55).toFixed(2) + 's');
+    cell.style.setProperty('--sway-delay', (-((i * 13) % 9) * 0.6).toFixed(2) + 's');
+    cell.style.setProperty('--sway-a', (0.6 + h * 1.4).toFixed(2));
+    // 草は 3D の台の中に置かず、画面の平らな層 (#plants) に置く。
+    // 3D の中で動く物があると、ブラウザが重なりの順番を取り違え、奥の列の草が土の後ろに消えたため
+    const sp = document.createElement('div');
+    sp.className = 'sprite';
+    sp.dataset.index = String(i);
+    sp.style.setProperty('--sway-d', cell.style.getPropertyValue('--sway-d'));
+    sp.style.setProperty('--sway-delay', cell.style.getPropertyValue('--sway-delay'));
+    sp.style.setProperty('--sway-a', cell.style.getPropertyValue('--sway-a'));
+    const img = plantImg(id, 'plant');
+    img.dataset.index = String(i);
+    sp.appendChild(img);
+    els.plants.appendChild(sp);
+    sprites[i] = sp;
+    placeSprite(i);
     cell.setAttribute('aria-label', s.name);
+  }
+
+  /**
+   * 草を、そのマスの根元が画面に見えている所へ置く。大きさは、その奥行きでのマスの幅に合わせる
+   * (奥の列ほど小さく見える)。手前の列ほど上に重ねる。
+   */
+  function placeSprite(i) {
+    const sp = sprites[i];
+    if (!sp) return;
+    const g = groundEl(i).getBoundingClientRect();
+    const L = layerRect || (layerRect = els.plants.getBoundingClientRect());
+    const cellW = g.width / 0.92;          // .ground はマスの幅の 92%
+    const w = cellW * 1.6;
+    const h = w * (window.KusaArt.H / window.KusaArt.W);
+    const baseX = g.left + g.width / 2 - L.left;
+    const baseY = g.top + g.height / 2 - L.top;
+    sp.style.width = w.toFixed(1) + 'px';
+    sp.style.height = h.toFixed(1) + 'px';
+    sp.style.left = (baseX - w / 2).toFixed(1) + 'px';
+    sp.style.top = (baseY - h * 0.94).toFixed(1) + 'px'; // 絵の根元は下端から 6% 上
+    sp.style.zIndex = String(10 + Math.floor(i / C.fieldSize(game)));
+  }
+
+  let layerRect = null;
+  function placeAll() {
+    layerRect = null;
+    for (let i = 0; i < sprites.length; i++) placeSprite(i);
   }
 
   function render() {
@@ -120,9 +166,11 @@
     for (let i = 0; i < game.cells.length; i++) {
       cellEl(i).classList.toggle('selected', i === selected);
       cellEl(i).classList.toggle('hint', hints.indexOf(i) >= 0);
+      if (sprites[i]) sprites[i].classList.toggle('selected', i === selected);
     }
     const c = C.collection(game);
     els.bookCount.textContent = c.found + ' / ' + c.total;
+    els.bookMeter.style.width = (100 * c.found / c.total).toFixed(1) + '%';
     els.coins.textContent = String(game.coins);
     els.btnSell.classList.toggle('armed', selected >= 0);
   }
@@ -201,6 +249,8 @@
   /** 土が少し揺れる。 */
   function shake(i, strong) {
     const d = strong ? 3 : 2;
+    const sp = spriteEl(i);
+    if (sp) sp.animate([{ transform: 'translate(0,0)' }, { transform: 'translate(' + -d + 'px,0)' }, { transform: 'translate(' + d + 'px,0)' }, { transform: 'translate(0,0)' }], { duration: 220 });
     return cellEl(i).animate(
       [{ transform: 'translate(0,0)' }, { transform: 'translate(' + -d + 'px,1px)' }, { transform: 'translate(' + d + 'px,-1px)' },
         { transform: 'translate(' + (-d / 2) + 'px,0)' }, { transform: 'translate(0,0)' }],
@@ -291,6 +341,11 @@
       setRarity(els.discoverRarity, s.rarity);
       els.discover.classList.toggle('special', !!special);
       els.discover.hidden = false;
+      const im = els.discoverArt.querySelector('img');
+      if (im) {
+        im.animate([{ transform: 'scale(1.16, 0.05)', opacity: 0 }, { transform: 'scale(1.16, 1.2)', opacity: 1, offset: 0.6 }, { transform: 'scale(1.16)' }],
+          { duration: 700, delay: 180, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' });
+      }
       els.discover.querySelector('.discover-card').animate(
         [{ transform: 'scale(0.6)', opacity: 0 }, { transform: 'scale(1.04)', opacity: 1, offset: 0.7 }, { transform: 'scale(1)' }],
         { duration: 320, easing: 'ease-out' }
@@ -427,14 +482,14 @@
     }
     for (const el of stack) {
       if (el.closest('#btnSell')) return { kind: 'sell' };
-      const cell = el.closest('.cell');
-      if (!cell || !els.board.contains(cell)) continue;
-      const i = Number(cell.dataset.index);
-      if (el.classList.contains('plant')) {
+      if (el.classList.contains('plant') && el.dataset.index !== undefined) {
+        const i = Number(el.dataset.index);
         if (touchesPlant(el, i, x, y)) return { kind: 'cell', index: i };
         continue;
       }
-      return { kind: 'cell', index: i };
+      const cell = el.closest('.cell');
+      if (!cell || !els.board.contains(cell)) continue;
+      return { kind: 'cell', index: Number(cell.dataset.index) };
     }
     return { kind: 'none' };
   }
@@ -443,7 +498,7 @@
     if (busy || press) return;
     const hit = cellIndexAt(e.clientX, e.clientY);
     if (hit.kind !== 'cell') return;
-    els.board.setPointerCapture(e.pointerId); // 指がマスの外へ出ても、離すまで追う
+    els.stage.setPointerCapture(e.pointerId); // 指がマスの外へ出ても、離すまで追う
     press = { index: hit.index, x: e.clientX, y: e.clientY, id: e.pointerId, ghost: null, dragging: false, over: null };
   }
 
@@ -451,6 +506,7 @@
     const g = ghostOf(press.index);
     const r = g.el.getBoundingClientRect();
     cellEl(press.index).classList.add('dragging');
+    if (spriteEl(press.index)) spriteEl(press.index).classList.add('dragging');
     press.ghost = g;
     press.dragging = true;
     render(); // 重ねられる相手を光らせる
@@ -487,7 +543,7 @@
   function endPress(keepGhost) {
     const g = press && press.ghost;
     els.board.querySelectorAll('.cell.target').forEach((c) => c.classList.remove('target'));
-    els.board.querySelectorAll('.cell.dragging').forEach((c) => c.classList.remove('dragging'));
+    document.querySelectorAll('.cell.dragging, .sprite.dragging').forEach((c) => c.classList.remove('dragging'));
     press = null;
     if (g && !keepGhost) { g.el.remove(); return null; }
     return g;
@@ -547,7 +603,11 @@
     body.className = 'entry-body';
     const title = document.createElement('p');
     title.className = 'entry-title';
-    title.textContent = 'No.' + pad(C.number(s.id)) + ' ' + (found ? s.name : '???');
+    const no = document.createElement('span');
+    no.className = 'entry-no';
+    no.textContent = 'No.' + pad(C.number(s.id)) + ' ';
+    title.appendChild(no);
+    title.appendChild(document.createTextNode(found ? s.name : '???'));
     const tags = document.createElement('div');
     tags.className = 'entry-tags';
     const tag = document.createElement('span');
@@ -591,7 +651,10 @@
       h.className = 'group-title';
       h.textContent = g.name;
       els.bookList.appendChild(h);
-      g.list.forEach((s) => els.bookList.appendChild(entry(s)));
+      const grid = document.createElement('div');
+      grid.className = 'group-grid';
+      g.list.forEach((s) => grid.appendChild(entry(s)));
+      els.bookList.appendChild(grid);
     });
   }
 
@@ -628,18 +691,57 @@
     els.zoom.hidden = false;
   }
 
+  // ---- 背景と空気 ----
+  let backdropSize = '';
+  function drawBackdrop() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if (!(w >= 1 && h >= 1)) return; // 一瞬 0 で渡ってくることがある。前の絵のまま
+    const key = w + 'x' + h;
+    if (key === backdropSize) return;
+    backdropSize = key;
+    window.KusaArt.linen(document.getElementById('backdrop'), w, h, Math.min(1.5, window.devicePixelRatio || 1));
+  }
+
+  /** 光の中を漂う細かい粒。数は少なく、動きは CSS (transform と opacity) だけ。 */
+  function makeAir() {
+    const air = document.getElementById('air');
+    for (let i = 0; i < 12; i++) {
+      const sp = document.createElement('i');
+      sp.className = 'speck';
+      const r = (n) => ((i * 9301 + n * 49297) % 233280) / 233280; // 決まった並びの乱数
+      sp.style.left = (8 + r(1) * 70) + '%';
+      sp.style.top = (12 + r(2) * 60) + '%';
+      sp.style.setProperty('--d', (11 + r(3) * 9).toFixed(1) + 's');
+      sp.style.setProperty('--delay', (-r(4) * 20).toFixed(1) + 's');
+      sp.style.setProperty('--dx', (20 + r(5) * 60).toFixed(0) + 'px');
+      sp.style.setProperty('--dy', (-60 - r(6) * 80).toFixed(0) + 'px');
+      sp.style.setProperty('--o', (0.35 + r(7) * 0.5).toFixed(2));
+      const size = 2 + r(8) * 2.5;
+      sp.style.width = sp.style.height = size.toFixed(1) + 'px';
+      air.appendChild(sp);
+    }
+  }
+
   function main() {
+    drawBackdrop();
+    window.addEventListener('resize', () => { drawBackdrop(); placeAll(); });
+    // 書体の読み込みなどで台の位置が動いたら、草を置き直す (ずれると草が根元から浮く)
+    if (window.ResizeObserver) new ResizeObserver(() => placeAll()).observe(els.stage);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeAll);
+    window.KusaArt.strata(document.getElementById('strata'));
+    makeAir();
     // 土は動かないので1回だけ描く。飾りの草や苔は、合成用の草の根元 (各マス) を避けて置く
     const size = C.fieldSize(game);
     window.KusaArt.soil(document.getElementById('soil'), 7, { cols: size, rows: size, baseY: 0.78 });
     buildBoard();
     render();
 
-    els.board.addEventListener('pointerdown', onDown);
-    els.board.addEventListener('pointermove', onMove);
-    els.board.addEventListener('pointerup', onUp);
-    els.board.addEventListener('pointercancel', onCancel);
-    els.board.addEventListener('lostpointercapture', onCancel);
+    els.stage.addEventListener('pointerdown', onDown);
+    els.stage.addEventListener('pointermove', onMove);
+    els.stage.addEventListener('pointerup', onUp);
+    els.stage.addEventListener('pointercancel', onCancel);
+    els.stage.addEventListener('lostpointercapture', onCancel);
     els.btnPlant.addEventListener('click', plant);
     els.btnSell.addEventListener('click', tapSell);
     els.btnBook.addEventListener('click', openBook);
