@@ -11,12 +11,6 @@
   const C = window.Core;
   const SAVE_KEY = 'kusa.save.v1';
 
-  /**
-   * 草の絵。届いたらここに「id: パス」で足す (例 chibi_shiba: './img/chibi_shiba.png')。
-   * 無い草は仮の四角 (系統の色 + 名前) で出す。草の id は core.js の LINEAGES / EXTRAS にある。
-   */
-  const IMAGES = {};
-
   const $ = (id) => document.getElementById(id);
   const els = {
     board: $('board'), message: $('message'), coins: $('coins'), bookCount: $('bookCount'),
@@ -53,38 +47,29 @@
   }
 
   // ---- 絵 ----
-  function lineageClass(s) { return 'lin-' + (s.lineage || 'x'); }
+  // 草の絵は plants.js が core.js の見た目データから描く (届いた画像があればそれを使う)。
 
-  /** 草の絵を el の中に入れる。絵が無ければ仮の四角。 */
-  function drawArt(el, id) {
+  function plantImg(id, cls) {
     const s = C.speciesOf(id);
+    const img = document.createElement('img');
+    img.className = cls || '';
+    img.src = window.KusaArt.url(s);
+    img.alt = s.name;
+    img.draggable = false;
+    return img;
+  }
+
+  /** 図鑑や発見の札に草の絵を入れる。 */
+  function drawArt(el, id) {
     el.textContent = '';
-    el.classList.add('rare-' + s.rarity);
-    if (IMAGES[id]) {
-      const img = document.createElement('img');
-      img.src = IMAGES[id];
-      img.alt = s.name;
-      img.draggable = false;
-      el.appendChild(img);
-      return;
-    }
-    const ph = document.createElement('div');
-    ph.className = 'placeholder ' + lineageClass(s);
-    const lv = document.createElement('span');
-    lv.className = 'ph-lv';
-    lv.textContent = s.lineage ? 'Lv.' + s.level : '特殊';
-    const name = document.createElement('span');
-    name.className = 'ph-name';
-    name.textContent = s.name;
-    ph.appendChild(lv);
-    ph.appendChild(name);
-    el.appendChild(ph);
+    el.appendChild(plantImg(id));
   }
 
   // ---- 牧場 ----
   function buildBoard() {
     const size = C.fieldSize(game);
     els.board.style.gridTemplateColumns = 'repeat(' + size + ', 1fr)';
+    els.board.style.gridTemplateRows = 'repeat(' + size + ', 1fr)';
     els.board.textContent = '';
     shown.length = 0;
     for (let i = 0; i < size * size; i++) {
@@ -92,37 +77,42 @@
       cell.className = 'cell';
       cell.dataset.index = String(i);
       cell.setAttribute('role', 'gridcell');
+      const ground = document.createElement('div');
+      ground.className = 'ground';
+      cell.appendChild(ground);
       els.board.appendChild(cell);
       shown.push(undefined);
     }
   }
 
   function cellEl(i) { return els.board.children[i]; }
-  function grassEl(i) { return cellEl(i).querySelector('.grass'); }
+  function plantEl(i) { return cellEl(i).querySelector('.plant'); }
+  function groundEl(i) { return cellEl(i).querySelector('.ground'); }
 
   function renderCell(i) {
     const id = game.cells[i];
     if (shown[i] === id) return;
     shown[i] = id;
     const cell = cellEl(i);
-    cell.textContent = '';
+    const old = cell.querySelector('.stand');
+    if (old) old.remove();
+    cell.classList.toggle('has', !!id);
+    cell.classList.remove('glows');
+    cell.removeAttribute('aria-label');
     if (!id) return;
-    const g = document.createElement('div');
-    g.className = 'grass';
-    const art = document.createElement('div');
-    art.className = 'art';
-    drawArt(art, id);
-    g.appendChild(art);
-    g.setAttribute('aria-label', C.speciesOf(id).name);
-    cell.appendChild(g);
+    const s = C.speciesOf(id);
+    const glow = window.KusaArt.glow(s);
+    if (glow) { cell.classList.add('glows'); cell.style.setProperty('--glow', glow); }
+    const stand = document.createElement('div');
+    stand.className = 'stand';
+    stand.appendChild(plantImg(id, 'plant'));
+    cell.appendChild(stand);
+    cell.setAttribute('aria-label', s.name);
   }
 
   function render() {
     for (let i = 0; i < game.cells.length; i++) renderCell(i);
-    for (let i = 0; i < game.cells.length; i++) {
-      const g = grassEl(i);
-      if (g) g.classList.toggle('selected', i === selected);
-    }
+    for (let i = 0; i < game.cells.length; i++) cellEl(i).classList.toggle('selected', i === selected);
     const c = C.collection(game);
     els.bookCount.textContent = c.found + ' / ' + c.total;
     els.coins.textContent = String(game.coins);
@@ -132,80 +122,136 @@
   function say(text) { els.message.textContent = text; }
 
   // ---- 演出 ----
-  function centerOf(el) {
-    const r = el.getBoundingClientRect();
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
+  // 控えめで自然に。動かすのは Web Animations (element.animate) だけ。
+  // 位置は left/top で決め、動きは transform だけで付ける (位置決めを上書きしないため)。
+
+  /** 草の根元 (土の上の点) の、画面での位置。 */
+  function baseOf(i) {
+    const r = groundEl(i).getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height * 0.45 };
   }
 
-  /** 葉を飛ばす。inward なら外から中心へ集まる、そうでなければ中心から散る。 */
-  function leaves(at, inward, count, color) {
+  function spawn(cls, x, y, color) {
+    const el = document.createElement('div');
+    el.className = cls;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    if (color) el.style.background = color;
+    document.body.appendChild(el);
+    return el;
+  }
+  function done(anim, el) { return anim.finished.then(() => el.remove(), () => el.remove()); }
+
+  /** 葉が外からふわっと集まる。 */
+  function gather(at, colors, count) {
     const runs = [];
     for (let i = 0; i < count; i++) {
-      const leaf = document.createElement('div');
-      leaf.className = 'leaf';
-      if (color) leaf.style.background = color;
-      leaf.style.left = (at.x - 4) + 'px';
-      leaf.style.top = (at.y - 2) + 'px';
-      document.body.appendChild(leaf);
-      const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
-      const dist = 38 + Math.random() * 22;
-      const dx = Math.cos(angle) * dist;
-      const dy = Math.sin(angle) * dist;
-      const rot = Math.round(angle * 57);
-      const far = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (rot + 120) + 'deg)';
-      const near = 'translate(0,0) rotate(' + rot + 'deg)';
-      const a = leaf.animate(
-        inward
-          ? [{ transform: far, opacity: 0 }, { opacity: 1, offset: 0.3 }, { transform: near, opacity: 0.9 }]
-          : [{ transform: near, opacity: 1 }, { transform: far, opacity: 0 }],
-        { duration: inward ? 260 : 420, easing: inward ? 'cubic-bezier(.5,0,.8,.6)' : 'cubic-bezier(.2,.7,.3,1)' }
-      );
-      runs.push(a.finished.then(() => leaf.remove(), () => leaf.remove()));
+      const leaf = spawn('leaf', at.x - 4, at.y - 30, colors[i % colors.length]);
+      const a = (i / count) * Math.PI * 2 + Math.random() * 0.4;
+      const d = 46 + Math.random() * 20;
+      const far = 'translate(' + Math.cos(a) * d + 'px,' + Math.sin(a) * d * 0.7 + 'px) rotate(' + (a * 57 + 140) + 'deg)';
+      runs.push(done(leaf.animate(
+        [{ transform: far, opacity: 0 }, { opacity: 0.9, offset: 0.35 }, { transform: 'translate(0,24px) rotate(' + (a * 57) + 'deg) scale(0.6)', opacity: 0 }],
+        { duration: 380, easing: 'cubic-bezier(.45,0,.6,1)' }), leaf));
     }
     return Promise.all(runs);
   }
 
-  /** 新しい草がポンと生える。 */
-  function pop(i, delay) {
-    const g = grassEl(i);
-    if (!g) return Promise.resolve();
-    return g.animate(
-      [{ transform: 'scale(0.2)', opacity: 0 }, { transform: 'scale(1.15)', opacity: 1, offset: 0.6 }, { transform: 'scale(1)', opacity: 1 }],
-      { duration: 300, delay: delay || 0, easing: 'cubic-bezier(.3,1.4,.5,1)', fill: 'backwards' }
-    ).finished.catch(() => {});
+  /** 根元から土の粒が少し跳ねる。 */
+  function dirt(at, count) {
+    const runs = [];
+    for (let i = 0; i < count; i++) {
+      const d = spawn('dirt', at.x - 2, at.y - 2, i % 3 ? '#5a4128' : '#7a5a3a');
+      const dx = (Math.random() - 0.5) * 50;
+      const up = 10 + Math.random() * 16;
+      runs.push(done(d.animate(
+        [{ transform: 'translate(0,0)', opacity: 1 }, { transform: 'translate(' + dx * 0.6 + 'px,' + -up + 'px)', offset: 0.45 },
+          { transform: 'translate(' + dx + 'px,4px)', opacity: 0 }],
+        { duration: 420 + Math.random() * 160, easing: 'ease-out' }), d));
+    }
+    return Promise.all(runs);
   }
 
   /** 土が少し揺れる。 */
   function shake(i, strong) {
-    const d = strong ? 4 : 2.5;
+    const d = strong ? 3 : 2;
     return cellEl(i).animate(
       [{ transform: 'translate(0,0)' }, { transform: 'translate(' + -d + 'px,1px)' }, { transform: 'translate(' + d + 'px,-1px)' },
         { transform: 'translate(' + (-d / 2) + 'px,0)' }, { transform: 'translate(0,0)' }],
-      { duration: 200 }
+      { duration: 220 }
     ).finished.catch(() => {});
   }
 
-  /** 合成の瞬間: 草がふわっと集まり、土が揺れ、新しい草がポンと生える (7. 最初に作るバージョン)。 */
-  async function mergeEffect(i, special) {
-    const at = centerOf(cellEl(i));
-    const g = grassEl(i);
-    if (g) g.style.opacity = '0';
-    await leaves(at, true, special ? 12 : 8, special ? '#e8c45a' : null);
-    await shake(i, special);
-    if (g) g.style.opacity = '';
-    await Promise.all([pop(i), leaves(at, false, special ? 14 : 8, special ? '#f0d77a' : null)]);
+  /** 新しい草が土から生えてくる。 */
+  function grow(i, delay) {
+    const p = plantEl(i);
+    if (!p) return Promise.resolve();
+    return p.animate(
+      [{ transform: 'scale(0.55, 0.05)', opacity: 0 },
+        { transform: 'scale(0.9, 0.7)', opacity: 1, offset: 0.35 },
+        { transform: 'scale(1.04, 1.07) rotate(-1.5deg)', offset: 0.7 },
+        { transform: 'scale(1, 1) rotate(0.6deg)', offset: 0.88 },
+        { transform: 'scale(1, 1) rotate(0)' }],
+      { duration: 620, delay: delay || 0, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' }
+    ).finished.catch(() => {});
   }
 
-  /** 選んだ草を、重ねる先まで運ぶ (タップで合成したとき)。 */
-  function flyTo(from, to) {
-    const src = grassEl(from);
-    if (!src) return Promise.resolve();
-    const a = centerOf(src);
-    const b = centerOf(cellEl(to));
-    return src.animate(
-      [{ transform: 'translate(0,0)' }, { transform: 'translate(' + (b.x - a.x) + 'px,' + (b.y - a.y) + 'px) scale(0.8)' }],
-      { duration: 200, easing: 'ease-in', fill: 'forwards' }
-    ).finished.catch(() => {});
+  /** 特殊合成: 根元から柔らかい光が広がり、光の粒がゆっくり昇る。 */
+  function shine(at, glow) {
+    const halo = spawn('halo', at.x, at.y - 30);
+    if (glow) halo.style.setProperty('--glow', glow);
+    const runs = [done(halo.animate(
+      [{ transform: 'scale(0.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 0.9, offset: 0.3 }, { transform: 'scale(1.3)', opacity: 0 }],
+      { duration: 1100, easing: 'ease-out' }), halo)];
+    for (let i = 0; i < 10; i++) {
+      const m = spawn('mote', at.x + (Math.random() - 0.5) * 70, at.y - 10 - Math.random() * 30);
+      const rise = 40 + Math.random() * 50;
+      runs.push(done(m.animate(
+        [{ transform: 'translate(0,0) scale(0.4)', opacity: 0 }, { opacity: 1, offset: 0.25 },
+          { transform: 'translate(' + (Math.random() - 0.5) * 20 + 'px,' + -rise + 'px) scale(1)', opacity: 0 }],
+        { duration: 1000 + Math.random() * 500, delay: Math.random() * 300, easing: 'ease-out' }), m));
+    }
+    return Promise.all(runs);
+  }
+
+  /** 合成の瞬間: 草がふわっと集まり、土が少し揺れ、新しい草が土から生える。 */
+  async function mergeEffect(i, r, fromSpecies, toSpecies) {
+    const at = baseOf(i);
+    const s = C.speciesOf(r.id);
+    const p = plantEl(i);
+    if (p) p.style.opacity = '0';
+    const colors = [window.KusaArt.leafColor(fromSpecies), window.KusaArt.leafColor(toSpecies)];
+    await gather(at, colors, r.special ? 12 : 9);
+    if (p) p.style.opacity = '';
+    const runs = [shake(i, r.special), dirt(at, r.special ? 10 : 7), grow(i)];
+    if (r.special) runs.push(shine(at, window.KusaArt.glow(s)));
+    await Promise.all(runs);
+  }
+
+  /** 草の絵を、画面に固定した写しにする (運ぶ演出・指についてくる草)。 */
+  function ghostOf(i) {
+    const src = plantEl(i);
+    const r = src.getBoundingClientRect();
+    const g = src.cloneNode(true);
+    g.className = 'ghost';
+    g.style.left = r.left + 'px';
+    g.style.top = r.top + 'px';
+    g.style.width = r.width + 'px';
+    g.style.height = r.height + 'px';
+    document.body.appendChild(g);
+    return { el: g, w: r.width, h: r.height };
+  }
+
+  /** 運んできた草を、重ねる先の根元へ吸い込ませる。 */
+  function settle(ghost, to) {
+    const r = ghost.el.getBoundingClientRect();
+    const b = baseOf(to);
+    const dx = b.x - (r.left + r.width / 2);
+    const dy = b.y - (r.top + r.height * 0.94);
+    return done(ghost.el.animate(
+      [{ transform: 'translate(0,0) scale(1)', opacity: 1 },
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(0.55)', opacity: 0.2 }],
+      { duration: 240, easing: 'cubic-bezier(.5,0,.75,.4)', fill: 'forwards' }), ghost.el);
   }
 
   function showDiscover(id, special) {
@@ -247,12 +293,15 @@
     try { await task(); } finally { busy = false; render(); }
   }
 
+  let carried = null; // ドラッグで運んできた草の写し (離した所から、重ねる先へ吸い込ませる)
+
   /** from の草を to へ (重ねる / 動かす)。viaTap ならまず運ぶ演出をする。 */
   function act(from, to, viaTap) {
     return run(async () => {
       selected = -1;
       if (from === to) return;
       if (game.cells[to] == null) {
+        if (carried) { carried.el.remove(); carried = null; }
         if (C.move(game, from, to)) saveSoon();
         render();
         return;
@@ -261,18 +310,25 @@
       const b = C.speciesOf(game.cells[to]);
       // 合成できるか先に見る (できないなら運ばずに知らせる)
       if (!C.merge(game.cells[from], game.cells[to])) {
+        if (carried) { carried.el.remove(); carried = null; }
         say(a.name + 'と' + b.name + 'では、何も起きなかった。');
         render();
         await Promise.all([shake(to), shake(from)]);
         return;
       }
-      if (viaTap) await flyTo(from, to);
+      const ghost = carried || (viaTap ? ghostOf(from) : null);
+      carried = null;
+      if (ghost) {
+        const src = plantEl(from);
+        if (src) src.style.opacity = '0';
+        await settle(ghost, to);
+      }
       const r = C.drop(game, from, to);
       saveSoon();
       render();
       const s = C.speciesOf(r.id);
       say(r.special ? a.name + ' + ' + b.name + ' → ' + s.name + '！' : s.name + 'に育った！');
-      await mergeEffect(to, r.special);
+      await mergeEffect(to, r, a, b);
       if (r.newlyFound) await showDiscover(r.id, r.special);
     });
   }
@@ -302,46 +358,78 @@
       render();
       const id = game.cells[i];
       say(C.speciesOf(id).name + 'が生えた。');
-      await Promise.all([shake(i), pop(i)]);
+      await Promise.all([grow(i), dirt(baseOf(i), 5)]);
       if (!before[id]) await showDiscover(id, false);
     });
   }
 
   // ---- 指の操作 ----
-  const DRAG_START = 8; // これより動いたらドラッグ
+  const DRAG_START = 8;   // これより動いたらドラッグ
+  const BASE_ZONE = 0.55; // マスの上からこの割合より下は「根元」
   let press = null;     // { index, x, y, id, ghost, dragging, over }
 
+  /** 指が草の葉や花に触れているか (透明なすき間なら false)。 */
+  function touchesPlant(img, i, x, y) {
+    const s = C.speciesOf(game.cells[i]);
+    if (!s) return false;
+    const r = img.getBoundingClientRect();
+    const nw = img.naturalWidth || window.KusaArt.W;
+    const nh = img.naturalHeight || window.KusaArt.H;
+    // object-fit: contain / object-position: 下寄せ で置いた絵の、実際に描かれている範囲
+    const k = Math.min(r.width / nw, r.height / nh);
+    const cw = nw * k;
+    const ch = nh * k;
+    const left = r.left + (r.width - cw) / 2;
+    const top = r.top + (r.height - ch);
+    return window.KusaArt.opaqueAt(s, (x - left) / cw, (y - top) / ch);
+  }
+
+  /**
+   * 指の下にあるのは、どのマスか。
+   * 手前の草は奥のマスに重なって見えるので、葉に触れていればその草のマス、
+   * すき間なら奥へ通して、その下の土のマスを選ぶ。
+   */
   function cellIndexAt(x, y) {
-    const el = document.elementFromPoint(x, y);
-    if (!el) return { kind: 'none' };
-    if (el.closest('#btnSell')) return { kind: 'sell' };
-    const cell = el.closest('.cell');
-    return cell ? { kind: 'cell', index: Number(cell.dataset.index) } : { kind: 'none' };
+    const stack = document.elementsFromPoint(x, y);
+    // 根元のあたり (マスの下寄り) を押したら、上に手前の草の葉がかかっていても、そのマスを選ぶ。
+    // 背の高い草が並ぶと奥の草の根元が隠れ、奥の草を選べなくなるため
+    for (const el of stack) {
+      if (!el.classList.contains('cell') || !els.board.contains(el)) continue;
+      const r = el.getBoundingClientRect();
+      if ((y - r.top) / r.height > BASE_ZONE) return { kind: 'cell', index: Number(el.dataset.index) };
+      break;
+    }
+    for (const el of stack) {
+      if (el.closest('#btnSell')) return { kind: 'sell' };
+      const cell = el.closest('.cell');
+      if (!cell || !els.board.contains(cell)) continue;
+      const i = Number(cell.dataset.index);
+      if (el.classList.contains('plant')) {
+        if (touchesPlant(el, i, x, y)) return { kind: 'cell', index: i };
+        continue;
+      }
+      return { kind: 'cell', index: i };
+    }
+    return { kind: 'none' };
   }
 
   function onDown(e) {
     if (busy || press) return;
-    const cell = e.target.closest('.cell');
-    if (!cell) return;
+    const hit = cellIndexAt(e.clientX, e.clientY);
+    if (hit.kind !== 'cell') return;
     els.board.setPointerCapture(e.pointerId); // 指がマスの外へ出ても、離すまで追う
-    press = { index: Number(cell.dataset.index), x: e.clientX, y: e.clientY, id: e.pointerId, ghost: null, dragging: false, over: null };
+    press = { index: hit.index, x: e.clientX, y: e.clientY, id: e.pointerId, ghost: null, dragging: false, over: null };
   }
 
   function startDrag() {
-    const src = grassEl(press.index);
-    const r = src.getBoundingClientRect();
-    const ghost = src.cloneNode(true);
-    ghost.classList.remove('selected');
-    ghost.classList.add('ghost');
-    ghost.style.width = r.width + 'px';
-    ghost.style.height = r.height + 'px';
-    ghost.style.inset = 'auto';
-    document.body.appendChild(ghost);
-    src.classList.add('dragging');
-    press.ghost = ghost;
+    const g = ghostOf(press.index);
+    const r = g.el.getBoundingClientRect();
+    cellEl(press.index).classList.add('dragging');
+    press.ghost = g;
     press.dragging = true;
-    press.w = r.width;
-    press.h = r.height;
+    // つかんだ所が指の下に残るように
+    press.dx = press.x - r.left;
+    press.dy = press.y - r.top;
   }
 
   function setOver(target) {
@@ -363,16 +451,19 @@
       render();
       startDrag();
     }
-    press.ghost.style.left = (e.clientX - press.w / 2) + 'px';
-    press.ghost.style.top = (e.clientY - press.h / 2) + 'px';
+    press.ghost.el.style.left = (e.clientX - press.dx) + 'px';
+    press.ghost.el.style.top = (e.clientY - press.dy) + 'px';
     setOver(cellIndexAt(e.clientX, e.clientY));
   }
 
-  function endPress() {
-    if (press && press.ghost) press.ghost.remove();
+  /** 押していた指を手放す。keepGhost なら、運んできた草の写しを返す (重ねる演出に使う)。 */
+  function endPress(keepGhost) {
+    const g = press && press.ghost;
     els.board.querySelectorAll('.cell.target').forEach((c) => c.classList.remove('target'));
-    els.board.querySelectorAll('.grass.dragging').forEach((g) => g.classList.remove('dragging'));
+    els.board.querySelectorAll('.cell.dragging').forEach((c) => c.classList.remove('dragging'));
     press = null;
+    if (g && !keepGhost) { g.el.remove(); return null; }
+    return g;
   }
 
   function onUp(e) {
@@ -380,9 +471,10 @@
     const p = press;
     if (p.dragging) {
       const target = cellIndexAt(e.clientX, e.clientY);
-      endPress();
+      const toPlant = target.kind === 'cell' && target.index !== p.index && game.cells[target.index] != null;
+      const g = endPress(toPlant);
       if (target.kind === 'sell') sellAt(p.index);
-      else if (target.kind === 'cell') act(p.index, target.index, false);
+      else if (target.kind === 'cell') { carried = g; act(p.index, target.index, false); }
       else render();
       return;
     }
@@ -392,7 +484,7 @@
 
   function onCancel(e) {
     if (!press || e.pointerId !== press.id) return;
-    endPress();
+    endPress(false);
     render();
   }
 
@@ -510,6 +602,7 @@
   }
 
   function main() {
+    window.KusaArt.soil(document.getElementById('soil'), 7); // 土は動かないので1回だけ描く
     buildBoard();
     render();
 

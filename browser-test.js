@@ -169,6 +169,8 @@ async function run() {
       await phone.mouse.up();
     }
 
+    const total0 = await phone.evaluate(() => window.Core.SPECIES.length);
+
     section('種をまく');
     await phone.evaluate(() => { localStorage.clear(); window.__app.setGame(window.Core.createGame()); });
     await phone.locator('#btnPlant').click();
@@ -254,6 +256,121 @@ async function run() {
     await phone.locator('#btnZoomClose').click();
     await phone.locator('#btnBookClose').click();
     ok(!(await phone.locator('#book').isVisible()), '図鑑を閉じられる');
+
+    section('ジオラマと草の絵');
+    // 背の高い草で盤を埋めた、いちばん重なりの多い状態で見る
+    const tall = await phone.evaluate(() => ['ススキ', '月光草', '巨大タンポポ', '黄金のススキ'].map((n) => window.Core.findByName(n).id));
+    await setup(Object.fromEntries(Array.from({ length: 16 }, (_, i) => [i, tall[i % 4]])));
+    await phone.waitForTimeout(150);
+    const look = await phone.evaluate(() => {
+      const imgs = [...document.querySelectorAll('#board .plant')];
+      return {
+        count: imgs.length,
+        allImg: imgs.every((i) => i.tagName === 'IMG' && i.complete && i.naturalWidth > 0),
+        textOnly: document.querySelectorAll('.placeholder, .ph-name').length
+      };
+    });
+    ok(look.count === 16 && look.allImg, `草はどれも植物の絵 (img) で出る (${look.count} 枚)`);
+    ok(look.textOnly === 0, '文字だけの四角い表示が無い');
+
+    // 帯のボタンは、奥の草が上へはみ出しても押せる (草の絵の箱がふさいでいた)
+    const bars = await phone.evaluate(() => ['#btnBook', '#btnPlant', '#btnSell'].map((sel) => {
+      const r = document.querySelector(sel).getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return hit && hit.closest(sel) ? null : sel;
+    }).filter(Boolean));
+    ok(bars.length === 0, '背の高い草を植えても、上と下のボタンが押せる' + (bars.length ? ' (ふさがれた: ' + bars.join(',') + ')' : ''));
+
+    // どのマスも、根元の土を押せばそのマスが選ばれる (手前の草が奥のマスに重なって見えても)
+    const wrong = [];
+    for (let i = 0; i < 16; i++) {
+      const p = await phone.evaluate((k) => {
+        const r = document.querySelectorAll('#board .ground')[k].getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height * 0.75 };
+      }, i);
+      await phone.mouse.click(p.x, p.y);
+      const sel = await phone.evaluate(() => window.__app.selected());
+      if (sel !== i) wrong.push(i + '→' + sel);
+      await phone.evaluate(() => window.__app.setGame(window.__app.game())); // 選んだのを解く (押し直すと重ねる操作になる)
+    }
+    ok(wrong.length === 0, '16 マスどれも、根元を押すとそのマスが選ばれる' + (wrong.length ? ' (' + wrong.join(' ') + ')' : ''));
+
+    // 手前の草の、葉の無いすき間を押すと、奥のマスへ通る
+    const through = await phone.evaluate(() => {
+      const ground = document.querySelectorAll('#board .ground')[1].getBoundingClientRect();
+      // 奥のマス (1) の根元の少し上を、手前の草 (5) の絵の箱が覆っているかを探す
+      const front = document.querySelectorAll('#board .plant')[5].getBoundingClientRect();
+      return { covered: ground.bottom > front.top, x: ground.left + ground.width / 2, y: ground.top + ground.height * 0.75 };
+    });
+    ok(through.covered, '手前の草の絵の箱が、奥のマスの根元に重なっている (見張りの前提)');
+
+    // 手前の草の葉の上 (根元ではない所) を押すと、手前の草が選ばれる
+    const leafHit = await phone.evaluate(() => {
+      const img = document.querySelectorAll('#board .plant')[5];
+      const r = img.getBoundingClientRect();
+      const cell = document.querySelectorAll('#board .cell')[5].getBoundingClientRect();
+      // 草の真ん中の縦の線をたどり、根元より上で、そのマスの上半分にある点を探す
+      const s = window.Core.speciesOf(window.__app.game().cells[5]);
+      for (let y = cell.top + 4; y < cell.top + cell.height * 0.5; y += 3) {
+        const v = (y - r.top) / r.height;
+        if (window.KusaArt.opaqueAt(s, 0.5, v)) return { x: r.left + r.width / 2, y: y };
+      }
+      return null;
+    });
+    if (leafHit) {
+      await phone.mouse.click(leafHit.x, leafHit.y);
+      ok(await phone.evaluate(() => window.__app.selected()) === 5, '草の葉を押すと、その草が選ばれる');
+      await phone.evaluate(() => window.__app.setGame(window.__app.game()));
+    } else {
+      ok(false, '草の葉を押すと、その草が選ばれる (葉のある点が見つからない)');
+    }
+
+    // 光が絵の端で四角く切れない: どの草も、絵のふち 2px は透明
+    const edges = await phone.evaluate(() => window.Core.SPECIES.filter((s) => {
+      const c = window.KusaArt.drawPlant(s);
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let worst = 0;
+      for (let y = 0; y < c.height; y++) {
+        for (const x of [0, 1, c.width - 2, c.width - 1]) worst = Math.max(worst, d[(y * c.width + x) * 4 + 3]);
+      }
+      for (let x = 0; x < c.width; x++) {
+        for (const y of [0, 1]) worst = Math.max(worst, d[(y * c.width + x) * 4 + 3]);
+      }
+      return worst > 24;
+    }).map((s) => s.name));
+    ok(edges.length === 0, 'どの草の絵も、左右と上のふちで切れていない' + (edges.length ? ' (' + edges.join(',') + ')' : ''));
+
+    const distinct = await phone.evaluate(() => new Set(window.Core.SPECIES.map((s) => window.KusaArt.url(s))).size);
+    ok(distinct === total0, `草ごとに違う絵になっている (${distinct} / ${total0})`);
+
+    const layout = await phone.evaluate(() => {
+      const soil = document.getElementById('soil').getBoundingClientRect();
+      const front = document.querySelector('.slab-front').getBoundingClientRect();
+      const msg = document.getElementById('message').getBoundingClientRect();
+      const plants = [...document.querySelectorAll('#board .plant')].map((e) => e.getBoundingClientRect());
+      return { left: soil.left, right: soil.right, frontBottom: front.bottom, msgTop: msg.top,
+        boardH: soil.height, plantW: Math.max(...plants.map((p) => p.width)) };
+    });
+    ok(layout.left >= 0 && layout.right <= 430, `台が画面の幅に収まる (${Math.round(layout.left)}〜${Math.round(layout.right)})`);
+    ok(layout.frontBottom <= layout.msgTop, `台の切り口が下の案内に重ならない (${Math.round(layout.frontBottom)} <= ${Math.round(layout.msgTop)})`);
+    // 台の下の影に filter: blur を使うと、合成の演出のたびに塗り直されて遅い端末で 30fps に落ちた
+    const blur = await phone.evaluate(() => getComputedStyle(document.getElementById('slab'), '::before').filter);
+    ok(blur === 'none', `台の影にぼかしの filter を使っていない (${blur})`);
+    ok(layout.boardH >= 480, `牧場が画面の中で大きい (土の高さ ${Math.round(layout.boardH)}px)`);
+
+    section('合成の演出');
+    await setup({ 4: chibi, 8: mitsu });
+    await drag(cellSel(4), cellSel(8));
+    await phone.waitForSelector('.halo', { timeout: 2000 }).then(() => ok(true, '特殊合成では、根元から光が広がる'), () => ok(false, '特殊合成では、根元から光が広がる'));
+    await phone.locator('#discover').waitFor({ state: 'visible' });
+    await closeDiscover();
+    const left = await phone.evaluate(() => ({
+      fx: document.querySelectorAll('.leaf, .dirt, .mote, .halo, .ghost').length,
+      shown: getComputedStyle(document.querySelectorAll('#board .plant')[0] || document.body).opacity,
+      plantOpacity: [...document.querySelectorAll('#board .plant')].map((p) => getComputedStyle(p).opacity)
+    }));
+    ok(left.fx === 0, `演出が終わると、葉・土・光の粒が残らない (${left.fx})`);
+    ok(left.plantOpacity.length === 1 && left.plantOpacity[0] === '1', '生えた草が見えている (隠したままにならない)');
 
     section('保存');
     await setup({ 0: fusa, 15: mitsu });

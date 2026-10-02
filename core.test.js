@@ -243,3 +243,21 @@ test('図鑑の番号は 1 から、重ならない', () => {
   assert.strictEqual(nums[0], 1);
   assert.strictEqual(new Set(nums).size, nums.length);
 });
+
+test('どの草にも見た目のデータがあり、知っている層だけを使っている', () => {
+  Core.SPECIES.forEach((s) => {
+    assert.ok(s.look && Array.isArray(s.look.layers) && s.look.layers.length > 0, `${s.name} の見た目が無い`);
+    s.look.layers.forEach((l) => assert.ok(Core.LAYER_TYPES.includes(l.t), `${s.name}: 知らない層 ${l.t}`));
+  });
+});
+
+test('見た目の表に、草に無い id や同じ鍵の書き重ねが無い', () => {
+  // 同じ鍵を2回書くと、エラーにならずに後ろだけが残る (落とし穴の表)。ソースを字として読んで数える
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, 'core.js'), 'utf8');
+  const block = src.slice(src.indexOf('const LOOKS = {'), src.indexOf('const IMAGES'));
+  const keys = [...block.matchAll(/^\s{4}([a-z_]+): \{/gm)].map((m) => m[1]);
+  assert.strictEqual(new Set(keys).size, keys.length, '同じ鍵がある');
+  const ids = new Set(Core.SPECIES.map((s) => s.id));
+  keys.forEach((k) => assert.ok(ids.has(k), `${k} という草は無い`));
+  assert.strictEqual(keys.length, ids.size);
+});

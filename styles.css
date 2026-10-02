@@ -53,26 +53,33 @@ button { font: inherit; color: inherit; }
 
 /* ---- 上の帯 ---- */
 #topbar {
+  /* 奥の草が上へはみ出しても、帯のボタンは押せるように手前に置く */
+  position: relative;
+  z-index: 5;
   flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
+  gap: 8px;
+  padding: 6px 14px 0;
 }
-.title { margin: 0; font-size: 22px; letter-spacing: 0.08em; color: var(--accent); flex: 1; }
+.title { margin: 0; font-size: 17px; letter-spacing: 0.12em; color: var(--accent); flex: 1; }
 .pill {
   border: 1px solid var(--line);
   background: var(--bg-2);
   border-radius: 999px;
-  padding: 7px 14px;
-  font-size: 14px;
+  padding: 5px 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 .pill-label { color: var(--accent); }
 .coins { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-size: 15px; min-width: 52px; }
 .coin-dot { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffe7a0, var(--gold)); }
 
-/* ---- 牧場 (ジオラマ) ---- */
+/* ---- 牧場 (ジオラマ) ----
+ * 斜め上から見下ろす土の台。台 (#slab) を奥へ倒し、草はそれぞれ起こして正面を向かせる。
+ * 4x4 のマスはそのまま (#board の grid)。境目の線は引かず、土は1枚の絵 (#soil) にする。
+ */
+:root { --tilt: 28deg; --slab-w: 368px; --slab-h: 600px; }
 #stage {
   flex: 1;
   min-height: 0;
@@ -80,94 +87,132 @@ button { font: inherit; color: inherit; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  padding: 0 16px;
+  gap: 6px;
 }
 #diorama {
-  /* 板の厚みを下に見せて、斜め上から見下ろす台に見せる */
-  width: 398px;
-  padding: 10px;
-  border-radius: 18px;
-  background: linear-gradient(#6b5139, #4e3a28);
-  box-shadow:
-    0 14px 0 var(--soil-edge),
-    0 26px 30px rgba(60, 45, 20, 0.28);
+  pointer-events: none; /* 台の箱は触らせない。触れるのはマスと草だけ */
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  perspective: 1300px;
+  perspective-origin: 50% 30%;
+  /* 倒した台は箱より背が低く見える。そのぶんの上下の空きを詰め、奥の草がはみ出す分だけ上を空ける */
+  margin: -40px 0 24px;
+}
+#slab {
+  position: relative;
+  width: var(--slab-w);
+  height: var(--slab-h);
+  transform: rotateX(var(--tilt));
+  transform-style: preserve-3d;
+}
+#slab::before {
+  /* 台の下の、机に落ちる影 */
+  content: "";
+  position: absolute;
+  inset: 4% -3% -10%;
+  border-radius: 24px;
+  /* filter: blur はかけない。動く物があるたびに塗り直され、遅い端末で 30fps に落ちた。グラデーションだけでぼかす */
+  background: radial-gradient(closest-side, rgba(70, 55, 25, 0.32), rgba(70, 55, 25, 0.12) 65%, transparent);
+  transform: translateZ(-40px);
+}
+#soil {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25), inset 0 0 24px rgba(0, 0, 0, 0.35);
+}
+.slab-front {
+  /* 台の手前の切り口 (土の層) */
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: 100%;
+  height: 40px;
+  transform-origin: top center;
+  transform: rotateX(-90deg);
+  border-radius: 0 0 12px 12px;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.45)),
+    linear-gradient(#3f2c1d 0 22%, #5a4128 22% 40%, #4a3523 40% 62%, #6a5034 62% 78%, #3a281a 78%);
 }
 #board {
+  pointer-events: auto;
+  position: absolute;
+  inset: 0;
   display: grid;
-  gap: 4px;
-  width: 378px;
-  height: 378px;
+  transform-style: preserve-3d;
+  transform: translateZ(0.5px);
   touch-action: none;
 }
 .cell {
   position: relative;
-  border-radius: 10px;
-  background:
-    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.07), transparent 40%),
-    radial-gradient(circle at 70% 80%, rgba(0, 0, 0, 0.18), transparent 50%),
-    var(--soil);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35);
+  transform-style: preserve-3d;
 }
-.cell.target { box-shadow: inset 0 0 0 3px rgba(255, 230, 140, 0.9); }
-
-/* 草。絵が届くまでは仮の四角 (系統の色 + 名前)。 */
-.grass {
+/* 根元の影と、光る草の照り返し (土の面に寝かせて置く) */
+.ground {
   position: absolute;
-  inset: 6%;
-  border-radius: 12px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  touch-action: none;
-  cursor: grab;
+  left: 8%;
+  right: 4%;
+  top: 34%;
+  bottom: 6%;
+  border-radius: 50%;
+  pointer-events: none;
 }
-.grass.selected { outline: 3px solid #fff3b0; outline-offset: 2px; }
-.grass.dragging { opacity: 0.25; }
-.art {
+.cell.has .ground {
+  background: radial-gradient(closest-side, rgba(12, 6, 2, 0.55), rgba(12, 6, 2, 0.2) 60%, transparent);
+  transform: translate(6%, -6%);
+}
+.cell.has.glows .ground::after {
+  content: "";
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  overflow: hidden;
+  inset: -45%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--glow), transparent);
+  mix-blend-mode: screen;
 }
-.art img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.placeholder {
+.cell.selected .ground {
+  box-shadow: 0 0 0 3px rgba(255, 246, 200, 0.85), 0 0 18px 4px rgba(255, 240, 180, 0.6);
+}
+.cell.target .ground {
+  background: radial-gradient(closest-side, rgba(255, 236, 160, 0.7), rgba(255, 236, 160, 0.15) 70%, transparent);
+}
+/* 草を起こして、正面を向かせる */
+.stand {
+  position: absolute;
+  left: 50%;
+  bottom: 22%;
+  width: 160%;
+  height: 200%;
+  transform: translateX(-50%) rotateX(calc(-1 * var(--tilt)));
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+.plant {
   width: 100%;
   height: 100%;
-  border-radius: inherit;
-  border: 2px dashed rgba(255, 255, 255, 0.55);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-  text-align: center;
-  line-height: 1.15;
-  padding: 4px;
+  display: block;
+  object-fit: contain;
+  object-position: 50% 100%;
+  transform-origin: 50% 94%;
+  pointer-events: auto;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
-.ph-lv { font-size: 11px; opacity: 0.9; }
-.ph-name { font-size: 12px; font-weight: 700; word-break: keep-all; overflow-wrap: anywhere; }
-.lin-shiba   { background: linear-gradient(160deg, #7fb04f, #4d7e2c); }
-.lin-clover  { background: linear-gradient(160deg, #8fcf7a, #3f8f45); }
-.lin-tanpopo { background: linear-gradient(160deg, #e9c93c, #8a9b3a); }
-.lin-susuki  { background: linear-gradient(160deg, #c9b07a, #7f7a45); }
-.lin-gensou  { background: linear-gradient(160deg, #7fe0e6, #3a6fb0); }
-.lin-x       { background: linear-gradient(160deg, #b9a6d9, #5f6f9a); }
-.rare-2 .placeholder { box-shadow: inset 0 0 0 2px rgba(255, 240, 170, 0.7); }
-.rare-3 .placeholder, .rare-4 .placeholder { box-shadow: inset 0 0 0 3px rgba(255, 220, 120, 0.9); }
+.cell.selected .plant { translate: 0 -6px; filter: brightness(1.12) drop-shadow(0 0 6px rgba(255, 245, 200, 0.8)); }
+.cell.dragging .plant { opacity: 0.25; }
 
 /* 指についてくる草 */
 .ghost {
   position: fixed;
   pointer-events: none;
   z-index: 50;
-  border-radius: 12px;
-  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
+  filter: drop-shadow(0 14px 10px rgba(40, 25, 10, 0.35));
 }
 
-/* 合成のとき飛ぶ葉 */
+/* 合成のとき飛ぶ葉・土・光 */
 .leaf {
   position: fixed;
   width: 9px;
@@ -177,17 +222,49 @@ button { font: inherit; color: inherit; }
   pointer-events: none;
   z-index: 40;
 }
+.dirt {
+  position: fixed;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #5a4128;
+  pointer-events: none;
+  z-index: 40;
+}
+.mote {
+  position: fixed;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fff6c8;
+  box-shadow: 0 0 8px 2px rgba(255, 236, 150, 0.8);
+  pointer-events: none;
+  z-index: 41;
+}
+.halo {
+  position: fixed;
+  width: 160px;
+  height: 160px;
+  margin: -80px 0 0 -80px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--glow, rgba(255, 230, 150, 0.7)), transparent);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 39;
+}
 
 .message {
   margin: 0;
   min-height: 1.5em;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--muted);
   text-align: center;
 }
 
 /* ---- 下のボタン ---- */
 #actions {
+  position: relative;
+  z-index: 5;
   flex: none;
   display: flex;
   gap: 12px;
@@ -227,8 +304,12 @@ button { font: inherit; color: inherit; }
 }
 .discover-kicker { margin: 0 0 12px; font-size: 22px; font-weight: 800; color: var(--accent); letter-spacing: 0.1em; }
 .discover.special .discover-kicker { color: var(--gold); }
-.discover-art, .zoom-art { position: relative; width: 150px; height: 150px; margin: 0 auto 12px; border-radius: 16px; }
-.discover-art .ph-name, .zoom-art .ph-name { font-size: 18px; }
+.discover-art, .zoom-art { position: relative; width: 150px; height: 170px; margin: 0 auto 12px; border-radius: 16px; overflow: hidden; }
+.discover-art, .zoom-art, .entry-art {
+  background: radial-gradient(ellipse 34% 7% at 50% 92%, rgba(63, 44, 29, 0.55), transparent), linear-gradient(#f6f3e6, #e4e0c8);
+}
+.discover-art img, .zoom-art img, .entry-art img { width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; display: block; transform: scale(1.18); transform-origin: 50% 96%; }
+.discover.special .discover-art { box-shadow: 0 0 30px 6px rgba(255, 220, 120, 0.55); }
 .discover-no { margin: 0; font-size: 13px; color: var(--muted); }
 .discover-name { margin: 4px 0 6px; font-size: 22px; }
 .discover-note { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
@@ -297,9 +378,7 @@ button { font: inherit; color: inherit; }
   text-align: left;
   cursor: pointer;
 }
-.entry-art { position: relative; flex: none; width: 58px; height: 58px; border-radius: 12px; }
-.entry-art .ph-name { font-size: 10px; }
-.entry-art .ph-lv { font-size: 9px; }
+.entry-art { position: relative; flex: none; width: 58px; height: 64px; border-radius: 12px; overflow: hidden; }
 .entry.unknown .entry-art { background: #2b2a24; display: flex; align-items: center; justify-content: center; color: #8a8775; font-size: 24px; font-weight: 700; }
 .entry-body { min-width: 0; flex: 1; }
 .entry-title { margin: 0 0 3px; font-weight: 700; font-size: 16px; }
@@ -318,6 +397,6 @@ button { font: inherit; color: inherit; }
   justify-content: center;
   background: rgba(40, 36, 20, 0.45);
 }
-.zoom-art { width: 220px; height: 220px; }
+.zoom-art { width: 220px; height: 250px; }
 .zoom-note { margin: 12px 0 0; font-size: 14px; }
 .zoom-recipe { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
