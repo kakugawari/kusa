@@ -74,6 +74,10 @@
       { t: 'blades', n: 20, h: 0.85, spread: 0.6, w: 3.2, colors: ['#6a5a24', '#d7b85a'], rib: 'rgba(255,240,200,0.7)' },
       { t: 'plume', n: 5, h: 0.97, size: 0.27, color: '#f0c45a' }, { t: 'sparkle', n: 6, color: '#ffe4a0' }] },
 
+    hakobe: { layers: [{ t: 'rosette', n: 9, size: 0.4, colors: ['#3e6a2a', '#86b450'] }, { t: 'sparkle', n: 6, color: '#f6f4ea' }] },
+    hinagiku: { layers: [{ t: 'rosette', n: 8, size: 0.45, colors: ['#3a6626', '#7fa846'] }, { t: 'flower', n: 3, h: 0.45, size: 0.16, color: '#f7f3e8' }] },
+    sumire: { layers: [{ t: 'rosette', n: 7, size: 0.42, colors: ['#33602a', '#6f9e48'] }, { t: 'flower', n: 3, h: 0.38, size: 0.14, color: '#7a52c8' }] },
+    wasurenagusa: { layers: [{ t: 'rosette', n: 9, size: 0.48, colors: ['#33602a', '#6f9e48'] }, { t: 'flower', n: 5, h: 0.5, size: 0.12, color: '#6aa8f0' }] },
     hikaru_kusa: { glow: 'rgba(150,255,170,0.6)', layers: [
       { t: 'blades', n: 26, h: 0.58, spread: 0.6, w: 2.8, colors: ['#1f5a3a', '#6fd99a'], rib: 'rgba(210,255,220,0.95)' }] },
     hoshi_kusa: { glow: 'rgba(170,200,255,0.6)', layers: [
@@ -92,6 +96,9 @@
       { t: 'blades', n: 14, h: 0.55, spread: 0.7, w: 2.8, colors: ['#4a6a2a', '#9ab85a'] }] },
     mizube_kusa: { layers: [{ t: 'blades', n: 16, h: 0.75, spread: 0.4, w: 2.6, colors: ['#22503f', '#6fb39a'], rib: 'rgba(220,255,240,0.5)' },
       { t: 'drops', n: 9 }] },
+    hotokenoza: { layers: [{ t: 'rosette', n: 9, size: 0.45, colors: ['#3a5a2a', '#7a9a4a'] }, { t: 'flower', n: 3, h: 0.42, size: 0.1, color: '#b0509a' }] },
+    oobako: { layers: [{ t: 'rosette', n: 7, size: 0.55, colors: ['#3a6626', '#86ae4c'] }, { t: 'plume', n: 3, h: 0.6, size: 0.14, color: '#a8a87a' }] },
+    gishigishi: { layers: [{ t: 'blades', n: 10, h: 0.7, spread: 0.5, w: 6, colors: ['#4a4a26', '#7a8a40'], rib: 'rgba(150,60,50,0.6)' }] },
     clover_shiba: { layers: [{ t: 'blades', n: 30, h: 0.5, spread: 0.7, w: 2.4, colors: G_LAWN },
       { t: 'clover', n: 4, leaflets: 3, size: 0.42, colors: G_CLOVER }] },
     watage_daigunsei: { layers: [{ t: 'rosette', n: 9, size: 0.55, colors: ['#3a6a26', '#7fae46'], toothed: true },
@@ -144,6 +151,13 @@
     kouun_hikarigusa: { src: './img/plants/kouun_hikarigusa.webp', size: 1.05 },
     hotaru_kusa: { src: './img/plants/hotaru_kusa.webp', size: 1.0 },
     uchuu_kusa: { src: './img/plants/uchuu_kusa.webp', size: 1.1 },
+    gishigishi: { src: './img/plants/gishigishi.webp', size: 1.0 },
+    oobako: { src: './img/plants/oobako.webp', size: 0.85 },
+    hotokenoza: { src: './img/plants/hotokenoza.webp', size: 0.8 },
+    wasurenagusa: { src: './img/plants/wasurenagusa.webp', size: 0.95 },
+    sumire: { src: './img/plants/sumire.webp', size: 0.85 },
+    hinagiku: { src: './img/plants/hinagiku.webp', size: 0.8 },
+    hakobe: { src: './img/plants/hakobe.webp', size: 0.65 },
   };
 
   return { LAYER_TYPES: LAYER_TYPES, LOOKS: LOOKS, IMAGES: IMAGES };

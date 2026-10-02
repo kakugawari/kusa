@@ -64,6 +64,13 @@ const RECIPES = {
   ougon_sougen: { cell: ['s1', 1, 3], filter: 'sepia(0.85) saturate(2.2) hue-rotate(-12deg) brightness(1.08)', add: [[['s1', 2, 4], 0.22, 0.9, 'sepia(0.85) saturate(2.4) hue-rotate(-14deg) brightness(1.1)']], glow: 'rgba(255,205,90,0.6)', note: '仮: 色を変えて組み合わせた' },
   kouun_hikarigusa: { cell: ['s1', 1, 5], filter: 'saturate(1.3) brightness(1.18)', glow: 'rgba(170,255,140,0.75)', dots: { n: 14, color: '#fffbd0' }, note: '仮: 光らせて作った' },
   hotaru_kusa: { cell: ['s1', 2, 5], filter: 'brightness(0.72) saturate(0.85)', dots: { n: 12, color: '#e4ff80' }, glow: 'rgba(200,255,120,0.35)', note: '仮: 暗くして光の粒を足した' },
+  hakobe: { cell: ['s1', 4, 1] },
+  hinagiku: { cell: ['s1', 3, 1] },
+  sumire: { cell: ['s1', 4, 4] },
+  wasurenagusa: { cell: ['s1', 3, 4] },
+  hotokenoza: { cell: ['s1', 3, 2] },
+  oobako: { cell: ['s1', 3, 3] },
+  gishigishi: { cell: ['s1', 3, 5] },
   uchuu_kusa: { cell: ['s1', 4, 5], filter: 'hue-rotate(40deg) brightness(0.7) saturate(1.4)', glow: 'rgba(170,130,255,0.75)', dots: { n: 20, color: '#ffffff' }, note: '仮: 色を変えて星を足した' }
 };
 

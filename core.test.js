@@ -64,7 +64,7 @@ test('レシピに無い組は合成できない', () => {
 });
 
 test('名前で引くレシピの草が、すべて存在する', () => {
-  Core.RECIPES.forEach((r) => r.forEach((n) => assert.ok(Core.findByName(n), `${n} が無い`)));
+  Core.RECIPES.forEach((r) => r.slice(0, 3).forEach((n) => assert.ok(Core.findByName(n), `${n} が無い`)));
 });
 
 test('草の id は固定の文字列で、名前や並びから作っていない', () => {
@@ -78,11 +78,40 @@ test('草の id は重ならず、レア度は表の範囲に収まる', () => {
   Core.SPECIES.forEach((s) => assert.ok(s.rarity >= 0 && s.rarity < Core.RARITIES.length, s.name));
 });
 
-test('牧場は 4x4 から始まり、芝生とクローバーだけが出る', () => {
+test('牧場は 4x4 から始まり、芝生・クローバー・野の花 (ハコベ) が出る', () => {
   const g = Core.createGame();
   assert.strictEqual(Core.fieldSize(g), 4);
   assert.strictEqual(g.cells.length, 16);
-  assert.deepStrictEqual(Core.unlockedSpecies(g), [id('ちび芝生'), id('三つ葉')]);
+  assert.deepStrictEqual(Core.unlockedSpecies(g), [id('ちび芝生'), id('三つ葉'), id('ハコベ')]);
+});
+
+test('野の花の系統: ハコベ → ヒナギク → スミレ → ワスレナグサ', () => {
+  assert.strictEqual(Core.merge(id('ハコベ'), id('ハコベ')).id, id('ヒナギク'));
+  assert.strictEqual(Core.merge(id('ヒナギク'), id('ヒナギク')).id, id('スミレ'));
+  assert.strictEqual(Core.merge(id('スミレ'), id('スミレ')).id, id('ワスレナグサ'));
+  assert.strictEqual(Core.merge(id('ワスレナグサ'), id('ワスレナグサ')), null);
+});
+
+test('野草の特殊合成は、最初の牧場で出る草だけで見つけられる (詰まない)', () => {
+  // 最初に生える Lv.1 と、それを重ねて育つ草だけで、レシピの両方の草がそろうこと
+  const g = Core.createGame();
+  const reach = new Set(Core.unlockedSpecies(g));
+  let grew = true;
+  while (grew) {
+    grew = false;
+    [...reach].forEach((a) => {
+      const r = Core.merge(a, a);
+      if (r && !reach.has(r.id)) { reach.add(r.id); grew = true; }
+    });
+  }
+  [['三つ葉', 'ハコベ', 'ホトケノザ'], ['ちび芝生', 'ハコベ', 'オオバコ'], ['ふさふさ芝生', 'ヒナギク', 'ギシギシ']].forEach(([a, b, out]) => {
+    assert.ok(reach.has(id(a)) && reach.has(id(b)), `${out} の材料がそろわない`);
+    assert.strictEqual(Core.merge(id(a), id(b)).id, id(out));
+  });
+});
+
+test('特殊合成のレシピには、どれもヒントがある', () => {
+  Core.RECIPES.forEach((r) => assert.ok(r[3] && r[3].length > 4, `${r[2]} のヒントが無い`));
 });
 
 test('置くと図鑑に載り、重ねると合成して元のマスが空く', () => {
@@ -178,7 +207,7 @@ test('草は空きマスへだけ動かせる', () => {
 test('種をまくと、空きマスに Lv.1 の解放済みの草が1つ生え、満杯なら -1', () => {
   const g = Core.createGame();
   const rng = Core.mulberry32(5);
-  const seeds = [id('ちび芝生'), id('三つ葉')];
+  const seeds = [id('ちび芝生'), id('三つ葉'), id('ハコベ')];
   for (let i = 0; i < 16; i++) {
     const at = Core.plant(g, rng);
     assert.ok(at >= 0);
@@ -195,9 +224,10 @@ test('最初の目標: 種をまいて芝生を重ねていくと、レアの黄
   const gold = id('黄金芝生');
   for (let turn = 0; turn < 500 && !g.discovered[gold]; turn++) {
     if (Core.plant(g, rng) < 0) {
-      const clover = g.cells.indexOf(id('三つ葉'));
-      assert.ok(clover >= 0, '三つ葉が無いのに満杯になった (詰んだ)');
-      Core.sell(g, clover);
+      // 芝生でない草を1つ売って場所を空ける
+      const other = g.cells.findIndex((c) => c && Core.speciesOf(c).lineage !== 'shiba');
+      assert.ok(other >= 0, '芝生しか無いのに満杯になった (詰んだ)');
+      Core.sell(g, other);
     }
     // 同じ草の組をすべて重ねる
     let merged = true;
