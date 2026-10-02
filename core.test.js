@@ -112,3 +112,50 @@ test('特殊合成すると、レシピが発見済みに記録される', () =>
   assert.strictEqual(r.id, id('クローバー芝生'));
   assert.strictEqual(Object.keys(g.recipesFound).length, 1);
 });
+
+test('草を売るとコインになり、図鑑の発見記録は消えない', () => {
+  const g = Core.createGame();
+  const a = id('ちび芝生');
+  Core.place(g, 0, a);
+  const before = g.coins;
+  assert.strictEqual(Core.sell(g, 0), Core.sellPrice(a));
+  assert.strictEqual(g.coins, before + Core.sellPrice(a));
+  assert.strictEqual(g.cells[0], null);
+  assert.strictEqual(Core.collection(g).found, 1);
+  assert.strictEqual(Core.sell(g, 0), null, '空のマスは売れない');
+});
+
+test('種は、解放済みで、コインが足りて、空きがあるときだけ買える', () => {
+  const g = Core.createGame();
+  assert.strictEqual(Core.buySeed(g, id('ススキ'), 0), false, 'まだ解放されていない');
+  assert.strictEqual(g.coins, Core.createGame().coins);
+  assert.ok(Core.buySeed(g, id('ちび芝生'), 0));
+  assert.strictEqual(g.coins, Core.createGame().coins - Core.price(id('ちび芝生')));
+  assert.strictEqual(Core.buySeed(g, id('ちび芝生'), 0), false, '埋まっている');
+  g.coins = 0;
+  assert.strictEqual(Core.buySeed(g, id('ちび芝生'), 1), false, 'コイン不足');
+  assert.strictEqual(g.cells[1], null);
+});
+
+test('土地を広げても、草は同じ位置に残り、新しい草が解放される', () => {
+  const g = Core.createGame();
+  Core.place(g, 5, id('ちび芝生')); // 4x4 の 1 行 1 列
+  g.coins = Core.LAND_PRICE[1];
+  assert.ok(Core.expand(g));
+  assert.strictEqual(Core.fieldSize(g), 6);
+  assert.strictEqual(g.cells.length, 36);
+  assert.strictEqual(g.cells[1 * 6 + 1], id('ちび芝生'));
+  assert.strictEqual(g.cells.filter((c) => c !== null).length, 1);
+  assert.strictEqual(g.coins, 0);
+  assert.ok(Core.unlockedSpecies(g).indexOf(id('ススキ')) >= 0);
+});
+
+test('コインが足りないと土地は広がらない。最後の牧場より先は無い', () => {
+  const g = Core.createGame();
+  g.coins = Core.LAND_PRICE[1] - 1;
+  assert.strictEqual(Core.expand(g), false);
+  assert.strictEqual(Core.fieldSize(g), 4);
+  g.coins = 1e9;
+  while (Core.expand(g));
+  assert.strictEqual(g.step, Core.FIELD_STEPS.length - 1);
+});

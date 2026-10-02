@@ -96,13 +96,24 @@
     ['星の草', '月光草', '宇宙草']
   ];
 
-  /** 牧場の広がり。最初は狭く。第3の中身と幻想の牧場の大きさは未決。 */
+  /**
+   * 牧場の広がり。最初は狭く。
+   * 第3牧場の「水辺や岩場」と、幻想の牧場の大きさ・解放する草は仮 (写真は「水辺や岩場などの環境を追加」
+   * 「夜・月・星に関係する伝説の草を解放」までしか書いていない)。
+   */
   const FIELD_STEPS = [
-    { name: '初期牧場', size: 4, unlock: ['ちび芝生', '三つ葉'] },
-    { name: '第2牧場', size: 6, unlock: ['芽', 'タンポポ', 'ススキ'] },
-    { name: '第3牧場', size: 8, unlock: [] },
-    { name: '幻想の牧場', size: null, unlock: [] }
+    { name: '初期牧場', size: 4, unlock: ['ちび芝生', '三つ葉'], env: [] },
+    { name: '第2牧場', size: 6, unlock: ['芽', 'タンポポ', 'ススキ'], env: [] },
+    { name: '第3牧場', size: 8, unlock: ['水辺の草'], env: ['水辺', '岩場'] },
+    { name: '幻想の牧場', size: 8, unlock: ['光る草'], env: ['夜', '月', '星'] }
   ];
+
+  // ---- コイン (値段はすべて仮) ----------------------------------------
+  // 草の値段 = レア度の基本 x 段。売るときはその半分。
+  // 種を買う値段 = 草の値段 (買った草を重ねて育てるより、買うほうが得にならない)。
+  const BASE_PRICE = [10, 30, 100, 300, 1000];
+  const LAND_PRICE = [0, 300, 1500, 8000]; // 牧場 step 番目へ広げる値段 (0 番目は最初から)
+  const START_COINS = 30;
 
   // 名前の重複 (芽は2系統) を避けるため、id は「系統:段」にする。
   // 名前で引くときは findByName (同名は最初の系統が優先)。
@@ -157,7 +168,10 @@
   // ---- 牧場と図鑑 ----------------------------------------------------
 
   function createGame() {
-    return { step: 0, cells: new Array(16).fill(null), discovered: {}, recipesFound: {} };
+    return {
+      step: 0, cells: new Array(FIELD_STEPS[0].size * FIELD_STEPS[0].size).fill(null),
+      coins: START_COINS, discovered: {}, recipesFound: {}
+    };
   }
 
   function fieldSize(game) { return FIELD_STEPS[game.step].size; }
@@ -206,6 +220,44 @@
     return { id: r.id, special: r.special, newlyFound: newlyFound };
   }
 
+  function price(id) { return BASE_PRICE[BY_ID[id].rarity] * BY_ID[id].level; }
+  function sellPrice(id) { return Math.floor(price(id) / 2); }
+
+  /** マスの草を売ってコインにする。図鑑の発見記録は消えない。売った額を返す (売れなければ null)。 */
+  function sell(game, index) {
+    const id = game.cells[index];
+    if (id == null) return null;
+    game.cells[index] = null;
+    const gain = sellPrice(id);
+    game.coins += gain;
+    return gain;
+  }
+
+  /** 種を買って空きマスに置く。置けたら true。コイン不足・未解放・満杯なら何も変えない。 */
+  function buySeed(game, id, index) {
+    if (unlockedSpecies(game).indexOf(id) < 0) return false;
+    if (game.coins < price(id)) return false;
+    if (!place(game, index, id)) return false;
+    game.coins -= price(id);
+    return true;
+  }
+
+  /** 次の牧場へ広げる。いまのマスの並びはそのまま、新しい空きが増える。広げたら true。 */
+  function expand(game) {
+    const next = game.step + 1;
+    if (next >= FIELD_STEPS.length || game.coins < LAND_PRICE[next]) return false;
+    const oldSize = fieldSize(game);
+    const size = FIELD_STEPS[next].size;
+    const cells = new Array(size * size).fill(null);
+    for (let i = 0; i < game.cells.length; i++) {
+      cells[Math.floor(i / oldSize) * size + (i % oldSize)] = game.cells[i];
+    }
+    game.coins -= LAND_PRICE[next];
+    game.step = next;
+    game.cells = cells;
+    return true;
+  }
+
   /** 図鑑の進み具合。 */
   function collection(game) {
     const found = SPECIES.filter(function (s) { return game.discovered[s.id]; }).length;
@@ -215,7 +267,7 @@
   return {
     RARITIES: RARITIES, LINEAGES: LINEAGES, SPECIES: SPECIES, RECIPES: RECIPES, FIELD_STEPS: FIELD_STEPS,
     findByName: findByName, merge: merge, createGame: createGame, fieldSize: fieldSize,
-    unlockedSpecies: unlockedSpecies, place: place, drop: drop, collection: collection,
+    unlockedSpecies: unlockedSpecies, price: price, sellPrice: sellPrice, sell: sell, buySeed: buySeed, expand: expand, LAND_PRICE: LAND_PRICE, place: place, drop: drop, collection: collection,
     mulberry32: mulberry32,
     shuffle: shuffle,
     roll: roll
