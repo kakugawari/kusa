@@ -98,8 +98,9 @@ async function run() {
   try {
     // ------------------------------------------------ スマホで開く
     // 対象は iPhone 16 Plus だけ (CLAUDE.md の決めごと)。playwright が名前を知らなければ同じ大きさで代える。
-    const PHONE = devices['iPhone 16 Plus'] || devices['iPhone 15 Plus'] ||
-      { ...devices['iPhone 13'], viewport: { width: 430, height: 932 } };
+    // 対象は iPhone 16 Plus だけ (CLAUDE.md の決めごと)。ホーム画面から開いたときの画面 430x932 で見る。
+    // playwright が名前を知らなくても動くように、大きさは自分で決める
+    const PHONE = { ...(devices['iPhone 16 Plus'] || devices['iPhone 15 Plus'] || devices['iPhone 13']), viewport: { width: 430, height: 932 } };
     section('スマホで開く (' + PHONE.viewport.width + 'x' + PHONE.viewport.height + ')');
     const context = await browser.newContext({ ...PHONE });
     const phone = await context.newPage();
@@ -361,16 +362,21 @@ async function run() {
       const top = document.getElementById('topbar').getBoundingClientRect();
       const field = getComputedStyle(document.getElementById('field'));
       return { left: board.left, right: board.right, top: board.top, bottom: board.bottom, barTop: bar.top, topBottom: top.bottom,
-        h: innerHeight, bg: field.backgroundImage, filters: [field.filter, getComputedStyle(document.getElementById('foliage')).filter] };
+        h: innerHeight, bg: field.backgroundImage, filters: [field.filter] };
     });
     ok(layout.left >= 0 && layout.right <= 430, `牧場が画面の幅に収まる (${Math.round(layout.left)}〜${Math.round(layout.right)})`);
     ok(layout.bottom <= layout.barTop && layout.top >= layout.topBottom, `牧場が上の札と下の木の板のあいだに収まる (${Math.round(layout.top)}〜${Math.round(layout.bottom)})`);
     ok((layout.bottom - layout.top) / layout.h >= 0.7, `牧場が画面の中で大きい (高さ ${Math.round(layout.bottom - layout.top)}px / 画面 ${layout.h}px)`);
     ok(/ground\.webp/.test(layout.bg), '地面の写真を背景に敷いている');
     // 画面全体の層に filter をかけると、合成の演出のたびに塗り直されて遅い端末で重くなった (ぼかしは canvas に焼き込む)
-    ok(layout.filters.every((f) => f === 'none'), `背景と手前の葉に filter を使っていない (${layout.filters.join(' / ')})`);
-    const fol = await phone.evaluate(() => { const c = document.getElementById('foliage'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 64) if (d[i] > 40) n++; return n / (d.length / 64); });
-    ok(fol > 0.02 && fol < 0.35, `手前のぼけた葉が、画面のふちにだけある (覆う割合 ${(fol * 100).toFixed(1)}%)`);
+    ok(layout.filters.every((f) => f === 'none'), `背景に filter を使っていない (${layout.filters.join(' / ')})`);
+    // 草を植えたマスには耕した土を敷く (まわりの地面の草と見分ける)。空いたマスには敷かない
+    await setup({ 0: chibi });
+    const tl = await phone.evaluate(() => [0, 1].map((i) => getComputedStyle(document.querySelectorAll('#board .ground')[i]).backgroundImage.slice(0, 15)));
+    ok(tl[0].startsWith('url(') && tl[1] === 'none', `植えたマスにだけ耕した土がある (${tl.join(' / ')})`);
+    // 数字は札の絵に描かれていない (消してある) ので、上に書いた数字が見えていること
+    const nums = await phone.evaluate(() => [document.getElementById('bookCount').textContent, document.getElementById('coins').textContent]);
+    ok(/^\d+ \/ \d+$/.test(nums[0]) && /^\d+$/.test(nums[1]), `図鑑とコインの数字が札に出ている (${nums.join(' / ')})`);
 
     section('草むらと目印');
     // 選ぶと、重ねられる相手 (同じ草) のマスが光る。まだ見つけていない特殊合成の相手は光らない

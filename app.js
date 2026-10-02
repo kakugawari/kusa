@@ -68,6 +68,7 @@
 
   // ---- 牧場 ----
   function buildBoard() {
+    els.board.style.setProperty('--tilled', 'url(' + window.KusaArt.tilled() + ')');
     const size = C.fieldSize(game);
     els.board.style.gridTemplateColumns = 'repeat(' + size + ', 1fr)';
     els.board.style.gridTemplateRows = 'repeat(' + size + ', 1fr)';
@@ -698,48 +699,6 @@
     els.zoom.hidden = false;
   }
 
-  // ---- 手前のぼけた葉 ----
-  // 画面の四隅に、手前にある葉をぼかして置く (奥行きが出る)。動かないので1回だけ描き、大きさが変わったら描き直す。
-  // ぼかしは canvas に焼き込む (CSS の filter で動く物の上にかけると、遅い端末で重くなった)
-  const FOLIAGE = [
-    // [草の id, 横 (画面の幅に対する割合), 縦 (高さに対する割合), 大きさ (幅に対する割合), 回転 (度)]
-    // 下の木の板 (高さ 約 90px) と画面の外に隠れない所に置く
-    ['konmori_shiba', 0.0, 0.17, 0.55, 30],
-    ['fusafusa_shiba', -0.02, 0.58, 0.5, 64],
-    ['hakobe', 0.04, 0.86, 0.5, 18],
-    ['konmori_shiba', 1.0, 0.84, 0.55, -20],
-    ['yotsuba', 1.1, 0.5, 0.4, -58]
-  ];
-  let foliageSize = '';
-  function drawFoliage() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    if (!(w >= 1 && h >= 1)) return; // 一瞬 0 で渡ってくることがある。前の絵のまま
-    const key = w + 'x' + h;
-    if (key === foliageSize) return;
-    foliageSize = key;
-    const k = Math.min(1.5, window.devicePixelRatio || 1);
-    const cv = document.getElementById('foliage');
-    cv.width = Math.round(w * k);
-    cv.height = Math.round(h * k);
-    const ctx = cv.getContext('2d');
-    FOLIAGE.forEach(([id, fx, fy, fs, rot]) => {
-      const s = C.speciesOf(id);
-      if (!s) return;
-      const img = new Image();
-      img.onload = () => {
-        const size = fs * w * k;
-        ctx.save();
-        ctx.translate(fx * w * k, fy * h * k);
-        ctx.rotate(rot * Math.PI / 180);
-        ctx.filter = 'blur(' + (3.5 * k).toFixed(1) + 'px) brightness(0.78) saturate(1.05)';
-        ctx.drawImage(img, -size / 2, -size * 0.65, size, size * 1.25);
-        ctx.restore();
-      };
-      img.src = window.KusaArt.url(s);
-    });
-  }
-
   /** 光の中を漂う細かい粒。数は少なく、動きは CSS (transform と opacity) だけ。 */
   function makeAir() {
     const air = document.getElementById('air');
@@ -761,8 +720,7 @@
   }
 
   function main() {
-    drawFoliage();
-    window.addEventListener('resize', () => { drawFoliage(); placeAll(); });
+    window.addEventListener('resize', placeAll);
     // 書体の読み込みなどで台の位置が動いたら、草を置き直す (ずれると草が根元から浮く)
     if (window.ResizeObserver) new ResizeObserver(() => placeAll()).observe(els.stage);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeAll);

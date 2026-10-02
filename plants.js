@@ -1145,5 +1145,77 @@
     ctx.fillRect(0, h * 0.5, w, h * 0.5);
   }
 
-  root.KusaArt = { url: url, opaqueAt: opaqueAt, heightOf: heightOf, sizeOf: sizeOf, imageOf: imageOf, lookOf: lookOf, glow: glow, leafColor: leafColor, soil: soil, linen: linen, strata: strata, drawPlant: drawPlant, W: W, H: H };
+
+  // ---- 耕した土 ----
+  /**
+   * 草を植えたマスの下に敷く、掘り返した土 (上から見た楕円)。
+   * 黒っぽく湿った土に、ほぐれた土のかたまりと小さな粒。光は左上から。ふちは地面になじむように薄くする。
+   * 1回だけ描いて、data URL を使い回す。
+   */
+  let tilledUrl = null;
+  function tilled() {
+    if (tilledUrl) return tilledUrl;
+    const w = 240, h = 104;
+    const c = makeCanvas(w, h);
+    const ctx = c.getContext('2d');
+    const rng = rngFor(43);
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(w / 2, h / 2, w / 2 - 2, h / 2 - 2, 0, 0, Math.PI * 2);
+    ctx.clip();
+    // 地: 湿った黒褐色。真ん中ほど濃い
+    const g = ctx.createRadialGradient(w * 0.46, h * 0.44, 4, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(38,25,14,0.96)');
+    g.addColorStop(0.7, 'rgba(50,33,19,0.9)');
+    g.addColorStop(1, 'rgba(70,50,30,0.15)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    // ほぐれた土のかたまり: 影 (右下) と光 (左上) で、ころっと見せる
+    for (let i = 0; i < 70; i++) {
+      const a = rng() * Math.PI * 2;
+      const d = Math.sqrt(rng()) * 0.86;
+      const x = w / 2 + Math.cos(a) * d * (w / 2 - 8);
+      const y = h / 2 + Math.sin(a) * d * (h / 2 - 5);
+      const r = 2 + Math.pow(rng(), 2) * 6;
+      const t = 58 + rng() * 40;
+      const fade = 1 - d * 0.7;
+      ctx.fillStyle = 'rgba(14,8,3,' + (0.5 * fade).toFixed(2) + ')';
+      ctx.beginPath();
+      ctx.ellipse(x + r * 0.35, y + r * 0.35, r, r * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const lg = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, 0, x, y, r);
+      lg.addColorStop(0, 'rgba(' + Math.round(t * 1.55) + ',' + Math.round(t * 1.15) + ',' + Math.round(t * 0.8) + ',' + fade.toFixed(2) + ')');
+      lg.addColorStop(1, 'rgba(' + Math.round(t * 0.8) + ',' + Math.round(t * 0.55) + ',' + Math.round(t * 0.35) + ',' + fade.toFixed(2) + ')');
+      ctx.fillStyle = lg;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r, r * 0.7, rng(), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // ふち: 掘った土が少し盛り上がった、明るめの粒の輪
+    for (let i = 0; i < 90; i++) {
+      const a = rng() * Math.PI * 2;
+      const d = 0.82 + rng() * 0.14;
+      const x = w / 2 + Math.cos(a) * d * (w / 2 - 4);
+      const y = h / 2 + Math.sin(a) * d * (h / 2 - 3);
+      const r = 1.5 + rng() * 3.5;
+      const lit = Math.sin(a) < 0 ? 1.25 : 0.85; // 奥 (上) のふちは光を受ける
+      const t = (70 + rng() * 35) * lit;
+      ctx.fillStyle = 'rgba(' + Math.round(t * 1.5) + ',' + Math.round(t * 1.1) + ',' + Math.round(t * 0.75) + ',0.9)';
+      ctx.beginPath();
+      ctx.ellipse(x, y, r, r * 0.7, rng(), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // 細かい粒
+    for (let i = 0; i < 160; i++) {
+      const x = rng() * w, y = rng() * h;
+      const t = 70 + rng() * 70;
+      ctx.fillStyle = 'rgba(' + Math.round(t * 1.4) + ',' + Math.round(t) + ',' + Math.round(t * 0.7) + ',0.55)';
+      ctx.fillRect(x, y, 1.2, 1.2);
+    }
+    ctx.restore();
+    tilledUrl = c.toDataURL('image/png');
+    return tilledUrl;
+  }
+
+  root.KusaArt = { tilled: tilled, url: url, opaqueAt: opaqueAt, heightOf: heightOf, sizeOf: sizeOf, imageOf: imageOf, lookOf: lookOf, glow: glow, leafColor: leafColor, soil: soil, linen: linen, strata: strata, drawPlant: drawPlant, W: W, H: H };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

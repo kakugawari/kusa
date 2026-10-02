@@ -51,15 +51,20 @@ button { font: inherit; color: inherit; }
 button:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; }
 
 
+html, body { height: 100vh; position: relative; }
 #app {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: 100%;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
 
-/* ---- 上の帯 ---- */
+/* ---- 上の帯 ----
+ * 札はユーザーの絵 (img/ui/*.webp。cut-ui.js がボタンのシートから切り出す)。
+ * 図鑑とコインの数字は遊ぶと変わるので、絵から消してあり、ここで上に書く。
+ * 位置は札の絵の中の割合 (cut-ui.js で消した四角に合わせてある)。iPhone 16 Plus (430pt) で決め打ち
+ */
 #topbar {
   /* 奥の草が上へはみ出しても、帯のボタンは押せるように手前に置く */
   position: relative;
@@ -67,70 +72,47 @@ button:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; }
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px 0;
+  justify-content: space-between;
+  padding: 6px 6px 0;
 }
-.title {
-  /* 題字もクリーム色の札に載せる (写真の地面の上でも読めるように) */
-  margin: 0 auto 0 0;
+.plate {
+  position: relative;
+  flex: none;
+  border: 0;
+  padding: 0;
+  background: center / 100% 100% no-repeat;
+  filter: drop-shadow(0 6px 8px rgba(20, 12, 4, 0.35));
+}
+.title { width: 168px; height: 63px; margin: 0; background-image: url("./img/ui/title.webp"); }
+.chip-book { width: 152px; height: 46px; background-image: url("./img/ui/book.webp"); cursor: pointer; }
+.chip-coin { width: 90px; height: 49px; background-image: url("./img/ui/coin.webp"); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.plate-num {
+  position: absolute;
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 16px 0 12px;
-  border-radius: 999px;
-  background: rgba(252, 248, 236, 0.9);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 6px 16px -8px rgba(20, 14, 4, 0.6);
-  font-family: var(--font-display);
+  justify-content: center;
+  gap: 2px;
+  font-family: var(--font-ui);
   font-weight: 700;
-  font-size: 22px;
-  letter-spacing: 0.1em;
-  color: var(--moss-deep);
-}
-.logo-sprout, .chip-icon, .btn-icon {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.logo-sprout { width: 22px; height: 22px; color: var(--moss); }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 999px;
-  background: rgba(252, 248, 236, 0.9);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 6px 16px -8px rgba(20, 14, 4, 0.6);
-  font-size: 14px;
-  font-weight: 700;
+  color: #4a3a26;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
-.chip-book { position: relative; cursor: pointer; padding-bottom: 3px; }
-.chip-icon { width: 18px; height: 18px; color: var(--moss); }
-.chip-unit { margin-left: 2px; font-size: 11px; font-weight: 500; color: var(--ink-soft); }
+.chip-book .plate-num { left: 53%; right: 8%; top: 17%; bottom: 39%; font-size: 16px; }
+.chip-book .plate-num small { font-size: 11px; margin-left: 2px; }
+.chip-coin .plate-num { left: 44%; right: 24%; top: 26%; bottom: 27%; font-size: 17px; }
 .meter {
   position: absolute;
-  left: 34px;
-  right: 12px;
-  bottom: 6px;
-  height: 2px;
-  border-radius: 2px;
-  background: rgba(70, 55, 30, 0.12);
+  left: 22%;
+  right: 16%;
+  top: 66%;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(120, 100, 60, 0.18);
   overflow: hidden;
 }
-.meter i { display: block; height: 100%; width: 0; background: var(--moss); border-radius: inherit; transition: width 0.6s ease; }
-.chip-coin { min-width: 66px; }
-.coin-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 32%, #fff4c4, #e3b548 45%, #a77a1c);
-  box-shadow: inset 0 0 0 1.5px rgba(120, 85, 20, 0.35), 0 1px 1px rgba(80, 55, 10, 0.3);
-}
+.meter i { display: block; height: 100%; width: 0; background: linear-gradient(#5d9a40, #3f6f2a); border-radius: inherit; transition: width 0.6s ease; }
 
 /* ---- 牧場 ----
  * 地面の写真 (#field) を画面いっぱいに敷き、その上に草を植える。
@@ -152,15 +134,6 @@ button:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; }
     radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(20, 14, 6, 0.38)),
     linear-gradient(180deg, rgba(20, 14, 6, 0.28), transparent 14%, transparent 82%, rgba(20, 14, 6, 0.35));
 }
-/* 手前にぼけた葉 (四隅)。動かないので、ぼかした絵を1回だけ描いて敷く */
-#foliage {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 4;
-  pointer-events: none;
-}
 #stage {
   position: relative;
   flex: 1;
@@ -169,7 +142,7 @@ button:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; }
 #board {
   pointer-events: auto;
   position: absolute;
-  inset: 34px 18px 8px;
+  inset: 40px 14px 34px;
   display: grid;
   touch-action: none;
 }
@@ -194,8 +167,8 @@ button:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; }
   pointer-events: none;
 }
 .cell.has .ground {
-  background: radial-gradient(closest-side, rgba(20, 12, 4, 0.45), rgba(20, 12, 4, 0.15) 55%, transparent),
-    radial-gradient(ellipse 30% 18% at 38% 40%, rgba(255, 235, 200, 0.10), transparent);
+  /* 草を植えたマスは、掘り返した土 (plants.js の tilled) を敷いて、まわりの地面の草と見分ける */
+  background: var(--tilled) center / 100% 100% no-repeat;
 }
 .cell.has .ground::before {
   content: "";
@@ -374,59 +347,35 @@ button:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; }
   100% { transform: translate(var(--dx, 40px), var(--dy, -90px)); opacity: 0; }
 }
 
-/* ---- 下のボタン ---- */
+/* ---- 下のボタン ----
+ * 木の板と2つのボタンは1枚の絵 (img/ui/bar.webp)。字も絵に描いてある。
+ * その上の、ボタンの絵の位置に、透明な押せるボタンを重ねる (位置は絵の中の割合)
+ */
 #actions {
-  /* 下の帯: 木の板 */
   position: relative;
   z-index: 5;
   flex: none;
-  display: flex;
-  gap: 12px;
-  margin: 0 8px;
-  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
-  border-radius: 22px 22px 0 0;
-  background:
-    repeating-linear-gradient(178deg, rgba(255, 220, 160, 0.06) 0 2px, transparent 2px 7px),
-    repeating-linear-gradient(182deg, rgba(40, 20, 5, 0.08) 0 1px, transparent 1px 11px),
-    linear-gradient(180deg, #9a6b3e, #7a4f2a 60%, #5e3b1f);
-  box-shadow: inset 0 2px 0 rgba(255, 220, 170, 0.35), inset 0 -6px 12px rgba(0, 0, 0, 0.25), 0 -8px 24px -10px rgba(10, 6, 2, 0.6);
+  width: 422px;
+  height: 91px;
+  margin: 0 auto calc(4px + env(safe-area-inset-bottom));
+  background: url("./img/ui/bar.webp") center / 100% 100% no-repeat;
+  filter: drop-shadow(0 -4px 10px rgba(20, 12, 4, 0.35));
 }
 .btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 60px;
+  position: absolute;
+  top: 16%;
+  height: 71%;
   border: 0;
-  border-radius: 20px;
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  border-radius: 999px;
+  background: transparent;
   cursor: pointer;
-  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  transition: background-color 0.08s, box-shadow 0.15s, transform 0.08s;
 }
-.btn-icon { width: 22px; height: 22px; }
-.btn-primary {
-  flex: 2;
-  color: #fbfbf2;
-  background: linear-gradient(180deg, #6a9a48, var(--moss) 55%, #4a7230);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -2px 0 rgba(0, 0, 0, 0.12), 0 4px 0 var(--moss-deep), 0 12px 22px -10px rgba(40, 60, 20, 0.6);
-}
-.btn-primary:active { transform: translateY(3px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 0 var(--moss-deep), 0 6px 12px -8px rgba(40, 60, 20, 0.6); }
-.btn-sell {
-  flex: 1;
-  color: var(--ink-soft);
-  background: rgba(252, 248, 236, 0.95);
-  border: 1px solid var(--line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 3px 0 rgba(70, 55, 30, 0.12), 0 10px 18px -12px rgba(60, 45, 20, 0.5);
-}
-.btn-sell:active { transform: translateY(2px); }
-.btn-sell.armed {
-  color: #7a4f1c;
-  border-color: rgba(168, 112, 60, 0.55);
-  background: #fbf0dc;
-  box-shadow: 0 0 0 3px rgba(201, 154, 46, 0.22), 0 3px 0 rgba(168, 112, 60, 0.3);
-}
+.btn-sell { left: 5%; width: 44.5%; }
+.btn-primary { left: 50.2%; width: 45.5%; }
+.btn:active { background: rgba(30, 20, 5, 0.14); transform: translateY(1px); }
+/* 草を選んで「売る」が効く状態: 金色の輪 */
+.btn-sell.armed { box-shadow: 0 0 0 3px rgba(240, 200, 90, 0.95), 0 0 18px 4px rgba(255, 220, 120, 0.6); }
 
 /* ---- 標本の台紙 (発見・拡大・図鑑で共通) ---- */
 .discover, .zoom {
