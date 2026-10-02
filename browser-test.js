@@ -485,6 +485,23 @@ async function run() {
       ok(apple.endsWith('.png'), `ホーム画面用アイコンが PNG (${apple})`);
       const res = await desk.request.get(URL + apple.replace('./', ''));
       ok(res.ok(), `${apple} が配信される`);
+      // iOS は透けた所を黒く塗るので、アイコンは隅まで不透明
+      const minAlpha = await desk.evaluate(async (src) => {
+        const im = new Image(); im.src = src; await im.decode();
+        const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+        const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+        const a = x.getImageData(0, 0, c.width, c.height).data;
+        let m = 255; for (let i = 3; i < a.length; i += 4) m = Math.min(m, a[i]);
+        return m;
+      }, apple);
+      ok(minAlpha === 255, `ホーム画面用アイコンに透けた所が無い (いちばん薄い所 ${minAlpha})`);
+      const manifest = await desk.evaluate(() => document.querySelector('link[rel="manifest"]')?.getAttribute('href'));
+      if (manifest) {
+        const m = await (await desk.request.get(URL + manifest.replace('./', ''))).json();
+        for (const icon of m.icons) {
+          ok((await desk.request.get(URL + icon.src.replace('./', ''))).ok(), `manifest のアイコン ${icon.src} が配信される`);
+        }
+      }
     }
 
     // ------------------------------------------------ 更新とオフライン (sw.js があれば)

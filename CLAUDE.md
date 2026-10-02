@@ -101,6 +101,9 @@ img/source/ img/plants/   届いたシート・地面の写真・見本 / 切り
 img/ground.webp           牧場の地面の写真 (画面いっぱいに敷く)
 img/ui/                   上の札と下の木の板の絵 (cut-ui.js がボタンのシートから切り出す)
 cut-ui.js                 ボタンのシートから画面の部品を切り出す道具 (node cut-ui.js)
+make-icon.js              ホーム画面のアイコンを作る道具 (node make-icon.js)。地面の写真 + 耕した土 + 四つ葉
+icon-180/192/512.png      アイコン (180 は apple-touch-icon。透けた所を作らない)
+manifest.webmanifest      ホーム画面に追加したときの名前・色・アイコン
 core.test.js              ロジックのテスト (node --test)
 browser-test.js           ブラウザで動かすテスト
 serve.js                  開発用サーバー
