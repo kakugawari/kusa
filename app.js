@@ -80,6 +80,9 @@
       const ground = document.createElement('div');
       ground.className = 'ground';
       cell.appendChild(ground);
+      const mark = document.createElement('div');
+      mark.className = 'mark';
+      cell.appendChild(mark);
       els.board.appendChild(cell);
       shown.push(undefined);
     }
@@ -101,6 +104,7 @@
     cell.removeAttribute('aria-label');
     if (!id) return;
     const s = C.speciesOf(id);
+    cell.style.setProperty('--h', window.KusaArt.heightOf(s).toFixed(2));
     const glow = window.KusaArt.glow(s);
     if (glow) { cell.classList.add('glows'); cell.style.setProperty('--glow', glow); }
     const stand = document.createElement('div');
@@ -112,11 +116,33 @@
 
   function render() {
     for (let i = 0; i < game.cells.length; i++) renderCell(i);
-    for (let i = 0; i < game.cells.length; i++) cellEl(i).classList.toggle('selected', i === selected);
+    const hints = hintsFor(press && press.dragging ? press.index : selected);
+    for (let i = 0; i < game.cells.length; i++) {
+      cellEl(i).classList.toggle('selected', i === selected);
+      cellEl(i).classList.toggle('hint', hints.indexOf(i) >= 0);
+    }
     const c = C.collection(game);
     els.bookCount.textContent = c.found + ' / ' + c.total;
     els.coins.textContent = String(game.coins);
     els.btnSell.classList.toggle('armed', selected >= 0);
+  }
+
+  /**
+   * 選んだ草と重ねられる相手のマス。同じ草と、すでに見つけたレシピの相手だけ
+   * (見つけていない特殊合成の相手は光らせない。答えを明かさないため)。
+   */
+  function hintsFor(i) {
+    if (i < 0 || game.cells[i] == null) return [];
+    const a = game.cells[i];
+    const out = [];
+    game.cells.forEach((b, j) => {
+      if (j === i || b == null) return;
+      const r = C.merge(a, b);
+      if (!r) return;
+      if (r.special && !game.recipesFound[a < b ? a + '|' + b : b + '|' + a]) return;
+      out.push(j);
+    });
+    return out;
   }
 
   function say(text) { els.message.textContent = text; }
@@ -128,7 +154,7 @@
   /** 草の根元 (土の上の点) の、画面での位置。 */
   function baseOf(i) {
     const r = groundEl(i).getBoundingClientRect();
-    return { x: r.left + r.width / 2, y: r.top + r.height * 0.45 };
+    return { x: r.left + r.width / 2, y: r.top + r.height * 0.5 };
   }
 
   function spawn(cls, x, y, color) {
@@ -427,6 +453,7 @@
     cellEl(press.index).classList.add('dragging');
     press.ghost = g;
     press.dragging = true;
+    render(); // 重ねられる相手を光らせる
     // つかんだ所が指の下に残るように
     press.dx = press.x - r.left;
     press.dy = press.y - r.top;
@@ -602,7 +629,9 @@
   }
 
   function main() {
-    window.KusaArt.soil(document.getElementById('soil'), 7); // 土は動かないので1回だけ描く
+    // 土は動かないので1回だけ描く。飾りの草や苔は、合成用の草の根元 (各マス) を避けて置く
+    const size = C.fieldSize(game);
+    window.KusaArt.soil(document.getElementById('soil'), 7, { cols: size, rows: size, baseY: 0.78 });
     buildBoard();
     render();
 

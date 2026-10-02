@@ -358,6 +358,48 @@ async function run() {
     ok(blur === 'none', `台の影にぼかしの filter を使っていない (${blur})`);
     ok(layout.boardH >= 480, `牧場が画面の中で大きい (土の高さ ${Math.round(layout.boardH)}px)`);
 
+    section('草むらと目印');
+    // 飾りの草や苔は、合成用の草の根元 (各マス) に置かない。合成する草と見まちがえないため
+    const decor = await phone.evaluate(() => {
+      const c = document.createElement('canvas');
+      c.width = 760; c.height = 1200;
+      window.KusaArt.soil(c, 7, { cols: 4, rows: 4, baseY: 0.78 });
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      const cw = c.width / 4, ch = c.height / 4;
+      let inBase = 0, all = 0;
+      for (let y = 0; y < c.height; y += 2) {
+        for (let x = 0; x < c.width; x += 2) {
+          const p = (y * c.width + x) * 4;
+          const green = d[p + 1] > d[p] + 8 && d[p + 1] > d[p + 2] + 20; // 苔・草の緑 (土は赤みが勝つ)
+          if (!green) continue;
+          all++;
+          const col = Math.floor(x / cw), row = Math.floor(y / ch);
+          const ex = (x - (col + 0.5) * cw) / (cw * 0.42), ey = (y - (row + 0.78) * ch) / (ch * 0.26);
+          if (ex * ex + ey * ey < 1) inBase++;
+        }
+      }
+      return { inBase, all };
+    });
+    ok(decor.all > 200, `土の上に飾りの苔や小さな草がある (緑の点 ${decor.all})`);
+    ok(decor.inBase === 0, `飾りの苔や草が、合成用の草の根元に置かれていない (${decor.inBase})`);
+
+    // 選ぶと、重ねられる相手 (同じ草) のマスが光る。まだ見つけていない特殊合成の相手は光らない
+    await setup({ 0: chibi, 9: chibi, 6: mitsu, 3: fusa });
+    await phone.evaluate(() => { window.__app.game().recipesFound = {}; });
+    const g0 = await phone.evaluate(() => { const r = document.querySelectorAll('#board .ground')[0].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height * 0.6 }; });
+    await phone.mouse.click(g0.x, g0.y);
+    await phone.waitForTimeout(250); // 輪はふわっと出る (0.15 秒)
+    const marks = await phone.evaluate(() => [...document.querySelectorAll('#board .cell')].map((c, i) => (c.classList.contains('hint') ? i : -1)).filter((i) => i >= 0));
+    ok(marks.length === 1 && marks[0] === 9, `同じ草のマスだけが光る (${marks.join(',')})`);
+    const selRing = await phone.evaluate(() => getComputedStyle(document.querySelectorAll('#board .mark')[0]).opacity);
+    ok(selRing === '1', '選んだ草のまわりに輪が出る');
+    await phone.evaluate(() => window.__app.setGame(window.__app.game()));
+
+    // 背の高い草ほど、影が長い
+    await setup({ 0: chibi, 1: tall[0] });
+    const hs = await phone.evaluate(() => [0, 1].map((i) => document.querySelectorAll('#board .ground')[i]).map((g) => getComputedStyle(g, '::before').width).map(parseFloat));
+    ok(hs[1] > hs[0] * 1.1, `背の高い草ほど影が長い (${Math.round(hs[0])} → ${Math.round(hs[1])}px)`);
+
     section('合成の演出');
     await setup({ 4: chibi, 8: mitsu });
     await drag(cellSel(4), cellSel(8));
