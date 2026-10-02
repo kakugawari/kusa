@@ -259,6 +259,81 @@
     return true;
   }
 
+  /** 草を空きマスへ動かす。動かせたら true。 */
+  function move(game, from, to) {
+    if (from === to || game.cells[from] == null || to < 0 || to >= game.cells.length || game.cells[to] !== null) return false;
+    game.cells[to] = game.cells[from];
+    game.cells[from] = null;
+    return true;
+  }
+
+  /**
+   * 種をまく (試作品では無料)。解放済みの Lv.1 の草を、空きマスのどこかに1つ生やす。
+   * 生えたマスの番号を返す。空きが無ければ -1。rng を渡せば結果を再現できる。
+   */
+  function plant(game, rng) {
+    const random = rng || Math.random;
+    const empty = [];
+    game.cells.forEach(function (c, i) { if (c === null) empty.push(i); });
+    if (!empty.length) return -1;
+    const seeds = unlockedSpecies(game).filter(function (id) { return BY_ID[id].level === 1; });
+    const index = empty[Math.floor(random() * empty.length)];
+    place(game, index, seeds[Math.floor(random() * seeds.length)]);
+    return index;
+  }
+
+  /** 図鑑の番号 (No.001 から)。並びは SPECIES の順。 */
+  function number(id) { return SPECIES.indexOf(BY_ID[id]) + 1; }
+
+  function speciesOf(id) { return BY_ID[id] || null; }
+
+  /**
+   * 未発見の草に出すヒント。答えそのものは出さない。
+   * 系統の草は、ひとつ前の段を見つけていれば「それを2つ重ねる」と分かる。
+   */
+  function hint(game, id) {
+    const s = BY_ID[id];
+    if (s.lineage) {
+      if (s.level === 1) return '牧場に種をまくと生えてくるかも。';
+      const prev = SPECIES.filter(function (p) { return p.next === id; })[0];
+      return game.discovered[prev.id] ? prev.name + 'を2つ重ねてみよう。' : '同じ草を重ねて育てた先にある。';
+    }
+    for (let i = 0; i < RECIPES.length; i++) {
+      if (RECIPES[i][2] === s.name) return '異なる草を組み合わせよう。';
+    }
+    return 'まだ見つけ方が分からない。';
+  }
+
+  // ---- 保存 ----------------------------------------------------------
+
+  /** 保存用の文字列にする。 */
+  function save(game) {
+    return JSON.stringify({ v: 1, step: game.step, cells: game.cells, coins: game.coins,
+      discovered: Object.keys(game.discovered), recipesFound: game.recipesFound });
+  }
+
+  /** 保存した文字列から戻す。壊れていたり、知らない草が入っていたら、そこだけ捨てる。 */
+  function load(text) {
+    const game = createGame();
+    let d;
+    try { d = JSON.parse(text); } catch (e) { return game; }
+    if (!d || d.v !== 1) return game;
+    if (Number.isInteger(d.step) && d.step >= 0 && d.step < FIELD_STEPS.length) game.step = d.step;
+    const n = FIELD_STEPS[game.step].size * FIELD_STEPS[game.step].size;
+    game.cells = new Array(n).fill(null);
+    if (Array.isArray(d.cells)) {
+      for (let i = 0; i < n && i < d.cells.length; i++) if (BY_ID[d.cells[i]]) game.cells[i] = d.cells[i];
+    }
+    if (typeof d.coins === 'number' && d.coins >= 0) game.coins = Math.floor(d.coins);
+    (Array.isArray(d.discovered) ? d.discovered : []).forEach(function (id) { if (BY_ID[id]) game.discovered[id] = true; });
+    if (d.recipesFound && typeof d.recipesFound === 'object') {
+      Object.keys(d.recipesFound).forEach(function (k) {
+        if (BY_ID[d.recipesFound[k]]) game.recipesFound[k] = d.recipesFound[k];
+      });
+    }
+    return game;
+  }
+
   /** 図鑑の進み具合。 */
   function collection(game) {
     const found = SPECIES.filter(function (s) { return game.discovered[s.id]; }).length;
@@ -269,6 +344,7 @@
     RARITIES: RARITIES, LINEAGES: LINEAGES, SPECIES: SPECIES, RECIPES: RECIPES, FIELD_STEPS: FIELD_STEPS,
     findByName: findByName, merge: merge, createGame: createGame, fieldSize: fieldSize,
     unlockedSpecies: unlockedSpecies, price: price, sellPrice: sellPrice, sell: sell, buySeed: buySeed, expand: expand, LAND_PRICE: LAND_PRICE, place: place, drop: drop, collection: collection,
+    move: move, plant: plant, number: number, speciesOf: speciesOf, hint: hint, save: save, load: load, RARITY_NAMES: RARITIES,
     mulberry32: mulberry32,
     shuffle: shuffle,
     roll: roll

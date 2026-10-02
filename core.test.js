@@ -164,3 +164,82 @@ test('コインが足りないと土地は広がらない。最後の牧場よ�
   while (Core.expand(g));
   assert.strictEqual(g.step, Core.FIELD_STEPS.length - 1);
 });
+
+test('草は空きマスへだけ動かせる', () => {
+  const g = Core.createGame();
+  Core.place(g, 0, id('ちび芝生'));
+  Core.place(g, 1, id('三つ葉'));
+  assert.strictEqual(Core.move(g, 0, 1), false);
+  assert.ok(Core.move(g, 0, 2));
+  assert.strictEqual(g.cells[0], null);
+  assert.strictEqual(g.cells[2], id('ちび芝生'));
+});
+
+test('種をまくと、空きマスに Lv.1 の解放済みの草が1つ生え、満杯なら -1', () => {
+  const g = Core.createGame();
+  const rng = Core.mulberry32(5);
+  const seeds = [id('ちび芝生'), id('三つ葉')];
+  for (let i = 0; i < 16; i++) {
+    const at = Core.plant(g, rng);
+    assert.ok(at >= 0);
+    assert.ok(seeds.includes(g.cells[at]));
+  }
+  assert.strictEqual(g.cells.filter((c) => c === null).length, 0);
+  assert.strictEqual(Core.plant(g, rng), -1);
+});
+
+test('最初の目標: 種をまいて芝生を重ねていくと、レアの黄金芝生まで届く (4x4 の中で)', () => {
+  // ちび芝生だけを拾って重ねる。三つ葉は売って場所を空ける
+  const g = Core.createGame();
+  const rng = Core.mulberry32(11);
+  const gold = id('黄金芝生');
+  for (let turn = 0; turn < 500 && !g.discovered[gold]; turn++) {
+    if (Core.plant(g, rng) < 0) {
+      const clover = g.cells.indexOf(id('三つ葉'));
+      assert.ok(clover >= 0, '三つ葉が無いのに満杯になった (詰んだ)');
+      Core.sell(g, clover);
+    }
+    // 同じ草の組をすべて重ねる
+    let merged = true;
+    while (merged) {
+      merged = false;
+      for (let a = 0; a < g.cells.length && !merged; a++) {
+        for (let b = a + 1; b < g.cells.length && !merged; b++) {
+          if (g.cells[a] && g.cells[a] === g.cells[b] && Core.drop(g, a, b)) merged = true;
+        }
+      }
+    }
+  }
+  assert.ok(g.discovered[gold], '黄金芝生に届かなかった');
+  assert.strictEqual(Core.speciesOf(gold).rarity, 2);
+});
+
+test('ヒントは答えの名前を出さず、ひとつ前を見つけていれば重ね方を教える', () => {
+  const g = Core.createGame();
+  assert.strictEqual(Core.hint(g, id('ふさふさ芝生')), '同じ草を重ねて育てた先にある。');
+  Core.place(g, 0, id('ちび芝生'));
+  assert.strictEqual(Core.hint(g, id('ふさふさ芝生')), 'ちび芝生を2つ重ねてみよう。');
+  Core.SPECIES.forEach((s) => assert.ok(!Core.hint(g, s.id).includes(s.name), `${s.name} のヒントに名前が出ている`));
+});
+
+test('保存して戻すと同じ状態になり、壊れたデータや知らない草は捨てる', () => {
+  const g = Core.createGame();
+  Core.place(g, 0, id('ちび芝生'));
+  Core.place(g, 1, id('三つ葉'));
+  Core.drop(g, 0, 1);
+  const back = Core.load(Core.save(g));
+  assert.deepStrictEqual(back, g);
+  assert.deepStrictEqual(Core.load('こわれた'), Core.createGame());
+  const odd = JSON.parse(Core.save(g));
+  odd.cells[2] = 'no_such_grass';
+  odd.discovered.push('no_such_grass');
+  const cleaned = Core.load(JSON.stringify(odd));
+  assert.strictEqual(cleaned.cells[2], null);
+  assert.ok(!cleaned.discovered.no_such_grass);
+});
+
+test('図鑑の番号は 1 から、重ならない', () => {
+  const nums = Core.SPECIES.map((s) => Core.number(s.id));
+  assert.strictEqual(nums[0], 1);
+  assert.strictEqual(new Set(nums).size, nums.length);
+});

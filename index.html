@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>kusa</title>
 <meta name="description" content="草の図鑑・合成ゲーム">
-<meta name="theme-color" content="#151a2e">
+<meta name="theme-color" content="#e9eedb">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./styles.css">
 </head>
@@ -14,19 +14,62 @@
 <div id="app">
   <header id="topbar">
     <h1 class="title">kusa</h1>
-    <div class="topbar-actions">
-      <button type="button" id="btnAction" class="btn btn-primary">ためす</button>
-    </div>
+    <button type="button" id="btnBook" class="pill" aria-label="図鑑を開く">
+      <span class="pill-label">図鑑</span> <span id="bookCount">0 / 0</span> 種
+    </button>
+    <span class="coins" aria-label="コイン"><span class="coin-dot"></span><span id="coins">0</span></span>
   </header>
 
   <main id="stage">
-    <p class="lead">ここにアプリを作る。</p>
-    <p class="result" id="result">—</p>
-    <p class="note">
-      ロジックは <code>src/core.js</code> に、画面は <code>src/app.js</code> に書く。<br>
-      <code>npm test</code> でロジックを、<code>npm run test:ui</code> で画面を確かめる。
-    </p>
+    <div id="diorama">
+      <div id="board" role="grid" aria-label="牧場"></div>
+    </div>
+    <p id="message" class="message" aria-live="polite">種をまいて、同じ草を重ねてみよう。</p>
   </main>
+
+  <footer id="actions">
+    <button type="button" id="btnSell" class="btn btn-sell">売る</button>
+    <button type="button" id="btnPlant" class="btn btn-primary">種をまく</button>
+  </footer>
+</div>
+
+<!-- 発見の演出 -->
+<div id="discover" class="discover" hidden>
+  <div class="discover-card">
+    <p class="discover-kicker" id="discoverKicker">発見！</p>
+    <div class="discover-art" id="discoverArt"></div>
+    <p class="discover-no" id="discoverNo"></p>
+    <h2 class="discover-name" id="discoverName"></h2>
+    <p class="rarity" id="discoverRarity"></p>
+    <p class="discover-note">図鑑に登録しました</p>
+  </div>
+</div>
+
+<!-- 図鑑 -->
+<section id="book" class="sheet" hidden aria-label="植物図鑑">
+  <header class="sheet-head">
+    <h2>植物図鑑</h2>
+    <span class="count-badge" id="bookCount2"></span>
+    <button type="button" id="btnBookClose" class="btn-close" aria-label="閉じる">×</button>
+  </header>
+  <div class="tabs" role="tablist">
+    <button type="button" class="tab on" data-group="lineage" role="tab">系統別</button>
+    <button type="button" class="tab" data-group="rarity" role="tab">レア度別</button>
+  </div>
+  <div id="bookList" class="book-list"></div>
+</section>
+
+<!-- 図鑑の拡大表示 -->
+<div id="zoom" class="zoom" hidden>
+  <div class="zoom-card">
+    <button type="button" id="btnZoomClose" class="btn-close" aria-label="閉じる">×</button>
+    <div class="zoom-art" id="zoomArt"></div>
+    <p class="discover-no" id="zoomNo"></p>
+    <h2 class="discover-name" id="zoomName"></h2>
+    <p class="rarity" id="zoomRarity"></p>
+    <p class="zoom-note" id="zoomNote"></p>
+    <p class="zoom-recipe" id="zoomRecipe"></p>
+  </div>
 </div>
 
 <script src="./core.js"></script>
