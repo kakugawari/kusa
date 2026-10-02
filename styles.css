@@ -237,7 +237,7 @@ button:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: calc(62% + 38% * var(--h, 0.4));
+  width: calc(45% + 65% * var(--h, 0.4));
   height: calc(55% + 30% * var(--h, 0.4));
   transform: translate(-36%, -40%) rotate(14deg);
   border-radius: 50%;
@@ -613,7 +613,7 @@ button:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; }
   box-shadow: 0 6px 14px -10px rgba(60, 45, 20, 0.5);
 }
 .entry-art { width: 100%; aspect-ratio: 1 / 0.92; border-radius: 3px; }
-.entry-art img { transform: scale(1.4); transform-origin: 50% 95%; }
+.entry-art img { transform: scale(1.12); transform-origin: 50% 95%; }
 .entry.unknown { cursor: default; background: rgba(255, 252, 242, 0.55); box-shadow: none; }
 .entry.unknown .entry-art {
   display: flex;

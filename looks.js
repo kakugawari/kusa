@@ -112,8 +112,39 @@
       { t: 'sparkle', n: 18, color: '#ffffff', glow: true }] }
   };
 
-  /** 届いた草の絵 (背景を抜いた PNG)。例: chibi_shiba: './img/chibi_shiba.png' */
-  const IMAGES = {};
+  /**
+   * 届いた草の絵。src は背景を抜いた絵 (cut-plants.js が届いたシートから作る)、
+   * size は牧場での見た目の大きさ (1 = マスいっぱい。ちび芝生は小さく、巨大タンポポは大きく)。
+   * ここに無い草は、上の LOOKS の層から描く。
+   */
+  const IMAGES = {
+    chibi_shiba: { src: './img/plants/chibi_shiba.webp', size: 0.6 },
+    fusafusa_shiba: { src: './img/plants/fusafusa_shiba.webp', size: 0.8 },
+    konmori_shiba: { src: './img/plants/konmori_shiba.webp', size: 1 },
+    ougon_shiba: { src: './img/plants/ougon_shiba.webp', size: 1.05 },
+    mitsuba: { src: './img/plants/mitsuba.webp', size: 0.7 },
+    yotsuba: { src: './img/plants/yotsuba.webp', size: 0.85 },
+    itsuba: { src: './img/plants/itsuba.webp', size: 0.95 },
+    kouun_clover: { src: './img/plants/kouun_clover.webp', size: 1.05 },
+    tanpopo: { src: './img/plants/tanpopo.webp', size: 0.85 },
+    watage: { src: './img/plants/watage.webp', size: 0.95 },
+    kyodai_tanpopo: { src: './img/plants/kyodai_tanpopo.webp', size: 1.15 },
+    susuki: { src: './img/plants/susuki.webp', size: 0.95 },
+    ooki_susuki: { src: './img/plants/ooki_susuki.webp', size: 1.1 },
+    ougon_susuki: { src: './img/plants/ougon_susuki.webp', size: 1.1 },
+    hikaru_kusa: { src: './img/plants/hikaru_kusa.webp', size: 0.8 },
+    hoshi_kusa: { src: './img/plants/hoshi_kusa.webp', size: 0.9 },
+    gekkou_kusa: { src: './img/plants/gekkou_kusa.webp', size: 1.0 },
+    niji_kusa: { src: './img/plants/niji_kusa.webp', size: 1.05 },
+    zassou: { src: './img/plants/zassou.webp', size: 0.8 },
+    mizube_kusa: { src: './img/plants/mizube_kusa.webp', size: 0.9 },
+    clover_shiba: { src: './img/plants/clover_shiba.webp', size: 0.9 },
+    watage_daigunsei: { src: './img/plants/watage_daigunsei.webp', size: 1.1 },
+    ougon_sougen: { src: './img/plants/ougon_sougen.webp', size: 1.15 },
+    kouun_hikarigusa: { src: './img/plants/kouun_hikarigusa.webp', size: 1.05 },
+    hotaru_kusa: { src: './img/plants/hotaru_kusa.webp', size: 1.0 },
+    uchuu_kusa: { src: './img/plants/uchuu_kusa.webp', size: 1.1 },
+  };
 
   return { LAYER_TYPES: LAYER_TYPES, LOOKS: LOOKS, IMAGES: IMAGES };
 });

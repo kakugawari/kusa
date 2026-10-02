@@ -63,10 +63,19 @@
   const Looks = root.KusaLooks || { LOOKS: {}, IMAGES: {} };
   const FALLBACK = { layers: [{ t: 'blades', n: 20, h: 0.5, spread: 0.5, w: 2.4, colors: ['#355f22', '#8fbf4c'] }] };
   function lookOf(species) { return Looks.LOOKS[species.id] || FALLBACK; }
-  function imageOf(species) { return Looks.IMAGES[species.id] || null; }
+  function imageOf(species) {
+    const e = Looks.IMAGES[species.id];
+    return e ? (typeof e === 'string' ? e : e.src) : null;
+  }
+  /** 牧場での見た目の大きさ (1 = マスいっぱい)。画像に書いてあればそれ、無ければ 1 */
+  function sizeOf(species) {
+    const e = Looks.IMAGES[species.id];
+    return e && typeof e === 'object' && e.size ? e.size : 1;
+  }
 
   /** 草の背の高さ (0〜1)。影の長さ・濃さに使う。 */
   function heightOf(species) {
+    if (imageOf(species)) return Math.min(1, 0.25 + sizeOf(species) * 0.55);
     let h = 0.2;
     lookOf(species).layers.forEach((L) => {
       if (L.h) h = Math.max(h, L.h);
@@ -1136,5 +1145,5 @@
     ctx.fillRect(0, h * 0.5, w, h * 0.5);
   }
 
-  root.KusaArt = { url: url, opaqueAt: opaqueAt, heightOf: heightOf, lookOf: lookOf, glow: glow, leafColor: leafColor, soil: soil, linen: linen, strata: strata, drawPlant: drawPlant, W: W, H: H };
+  root.KusaArt = { url: url, opaqueAt: opaqueAt, heightOf: heightOf, sizeOf: sizeOf, imageOf: imageOf, lookOf: lookOf, glow: glow, leafColor: leafColor, soil: soil, linen: linen, strata: strata, drawPlant: drawPlant, W: W, H: H };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

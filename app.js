@@ -143,7 +143,7 @@
     const g = groundEl(i).getBoundingClientRect();
     const L = layerRect || (layerRect = els.plants.getBoundingClientRect());
     const cellW = g.width / 0.92;          // .ground はマスの幅の 92%
-    const w = cellW * 1.6;
+    const w = cellW * 1.6 * window.KusaArt.sizeOf(C.speciesOf(game.cells[i])); // 草ごとの大きさ (looks.js)
     const h = w * (window.KusaArt.H / window.KusaArt.W);
     const baseX = g.left + g.width / 2 - L.left;
     const baseY = g.top + g.height / 2 - L.top;

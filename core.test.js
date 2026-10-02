@@ -259,6 +259,16 @@ test('画像の置き場所は、草のある id にだけ書いてある', () =
   Object.keys(Looks.IMAGES).forEach((k) => assert.ok(ids.has(k), `${k} という草は無い`));
 });
 
+test('画像の置き場所に書いたファイルが、すべてある', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  Object.entries(Looks.IMAGES).forEach(([k, e]) => {
+    const src = typeof e === 'string' ? e : e.src;
+    assert.ok(fs.existsSync(path.join(__dirname, src)), `${k}: ${src} が無い`);
+    if (typeof e === 'object') assert.ok(e.size > 0.3 && e.size < 1.6, `${k}: 大きさ ${e.size}`);
+  });
+});
+
 test('見た目の表に、草に無い id や同じ鍵の書き重ねが無い', () => {
   // 同じ鍵を2回書くと、エラーにならずに後ろだけが残る (落とし穴の表)。ソースを字として読んで数える
   const src = require('node:fs').readFileSync(require('node:path').join(__dirname, 'looks.js'), 'utf8');
