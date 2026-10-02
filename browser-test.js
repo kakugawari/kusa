@@ -128,14 +128,14 @@ async function run() {
       const app = document.getElementById('app');
       app.style.padding = '59px 0 34px';
       const r = document.getElementById('btnPlant').getBoundingClientRect();
-      const board = document.getElementById('diorama').getBoundingClientRect();
       const msg = document.getElementById('message').getBoundingClientRect();
-      const out = { plantBottom: r.bottom, boardBottom: board.bottom + 14, msgTop: msg.top, h: innerHeight };
+      const bar = document.getElementById('actions').getBoundingClientRect();
+      const out = { plantBottom: r.bottom, boardBottom: msg.bottom, msgTop: bar.top, h: innerHeight };
       app.style.padding = '';
       return out;
     });
     ok(safe.plantBottom <= safe.h - 34, `安全域を入れても「種をまく」が画面に収まる (下端 ${Math.round(safe.plantBottom)} / ${safe.h - 34})`);
-    ok(safe.boardBottom <= safe.msgTop, `牧場の台の厚みが、下の案内に重ならない (${Math.round(safe.boardBottom)} <= ${Math.round(safe.msgTop)})`);
+    ok(safe.boardBottom <= safe.msgTop, `案内の札が、下の木の板に重ならない (${Math.round(safe.boardBottom)} <= ${Math.round(safe.msgTop)})`);
 
     // ------------------------------------------------ kusa の操作
     const ID = (name) => phone.evaluate((n) => window.Core.findByName(n).id, name);
@@ -356,45 +356,23 @@ async function run() {
     ok(distinct === total0, `草ごとに違う絵になっている (${distinct} / ${total0})`);
 
     const layout = await phone.evaluate(() => {
-      const soil = document.getElementById('soil').getBoundingClientRect();
-      const front = document.querySelector('.slab-front').getBoundingClientRect();
-      const msg = document.getElementById('message').getBoundingClientRect();
-      const plants = [...document.querySelectorAll('#plants .plant')].map((e) => e.getBoundingClientRect());
-      return { left: soil.left, right: soil.right, frontBottom: front.bottom, msgTop: msg.top,
-        boardH: soil.height, plantW: Math.max(...plants.map((p) => p.width)) };
+      const board = document.getElementById('board').getBoundingClientRect();
+      const bar = document.getElementById('actions').getBoundingClientRect();
+      const top = document.getElementById('topbar').getBoundingClientRect();
+      const field = getComputedStyle(document.getElementById('field'));
+      return { left: board.left, right: board.right, top: board.top, bottom: board.bottom, barTop: bar.top, topBottom: top.bottom,
+        h: innerHeight, bg: field.backgroundImage, filters: [field.filter, getComputedStyle(document.getElementById('foliage')).filter] };
     });
-    ok(layout.left >= 0 && layout.right <= 430, `台が画面の幅に収まる (${Math.round(layout.left)}〜${Math.round(layout.right)})`);
-    ok(layout.frontBottom <= layout.msgTop, `台の切り口が下の案内に重ならない (${Math.round(layout.frontBottom)} <= ${Math.round(layout.msgTop)})`);
-    // 台の下の影に filter: blur を使うと、合成の演出のたびに塗り直されて遅い端末で 30fps に落ちた
-    const blur = await phone.evaluate(() => getComputedStyle(document.getElementById('slab'), '::before').filter);
-    ok(blur === 'none', `台の影にぼかしの filter を使っていない (${blur})`);
-    ok(layout.boardH >= 480, `牧場が画面の中で大きい (土の高さ ${Math.round(layout.boardH)}px)`);
+    ok(layout.left >= 0 && layout.right <= 430, `牧場が画面の幅に収まる (${Math.round(layout.left)}〜${Math.round(layout.right)})`);
+    ok(layout.bottom <= layout.barTop && layout.top >= layout.topBottom, `牧場が上の札と下の木の板のあいだに収まる (${Math.round(layout.top)}〜${Math.round(layout.bottom)})`);
+    ok((layout.bottom - layout.top) / layout.h >= 0.7, `牧場が画面の中で大きい (高さ ${Math.round(layout.bottom - layout.top)}px / 画面 ${layout.h}px)`);
+    ok(/ground\.webp/.test(layout.bg), '地面の写真を背景に敷いている');
+    // 画面全体の層に filter をかけると、合成の演出のたびに塗り直されて遅い端末で重くなった (ぼかしは canvas に焼き込む)
+    ok(layout.filters.every((f) => f === 'none'), `背景と手前の葉に filter を使っていない (${layout.filters.join(' / ')})`);
+    const fol = await phone.evaluate(() => { const c = document.getElementById('foliage'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 64) if (d[i] > 40) n++; return n / (d.length / 64); });
+    ok(fol > 0.02 && fol < 0.35, `手前のぼけた葉が、画面のふちにだけある (覆う割合 ${(fol * 100).toFixed(1)}%)`);
 
     section('草むらと目印');
-    // 飾りの草や苔は、合成用の草の根元 (各マス) に置かない。合成する草と見まちがえないため
-    const decor = await phone.evaluate(() => {
-      const c = document.createElement('canvas');
-      c.width = 760; c.height = 1360;
-      window.KusaArt.soil(c, 7, { cols: 4, rows: 4, baseY: 0.78 });
-      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-      const cw = c.width / 4, ch = c.height / 4;
-      let inBase = 0, all = 0;
-      for (let y = 0; y < c.height; y += 2) {
-        for (let x = 0; x < c.width; x += 2) {
-          const p = (y * c.width + x) * 4;
-          const green = d[p + 1] > d[p] + 8 && d[p + 1] > d[p + 2] + 20; // 苔・草の緑 (土は赤みが勝つ)
-          if (!green) continue;
-          all++;
-          const col = Math.floor(x / cw), row = Math.floor(y / ch);
-          const ex = (x - (col + 0.5) * cw) / (cw * 0.42), ey = (y - (row + 0.78) * ch) / (ch * 0.26);
-          if (ex * ex + ey * ey < 1) inBase++;
-        }
-      }
-      return { inBase, all };
-    });
-    ok(decor.all > 200, `土の上に飾りの苔や小さな草がある (緑の点 ${decor.all})`);
-    ok(decor.inBase === 0, `飾りの苔や草が、合成用の草の根元に置かれていない (${decor.inBase})`);
-
     // 選ぶと、重ねられる相手 (同じ草) のマスが光る。まだ見つけていない特殊合成の相手は光らない
     await setup({ 0: chibi, 9: chibi, 6: mitsu, 3: fusa });
     await phone.evaluate(() => { window.__app.game().recipesFound = {}; });
@@ -434,7 +412,7 @@ async function run() {
       backVisible.push(Math.round(diff * 100));
     }
     ok(backVisible.every((d) => d >= 2), `奥の列の草が、どれも画面に写っている (草が占める割合 ${backVisible.join(' / ')} %)`);
-    ok(await phone.evaluate(() => !document.querySelector('#slab .plant')), '草は 3D の台の中に置いていない');
+    ok(await phone.evaluate(() => !document.querySelector('#board .plant')), '草はマスの中ではなく、草の層に置いている');
 
     section('合成の演出');
     await setup({ 4: chibi, 8: mitsu });

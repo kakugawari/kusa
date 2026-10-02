@@ -80,6 +80,9 @@
       cell.className = 'cell';
       cell.dataset.index = String(i);
       cell.setAttribute('role', 'gridcell');
+      // マスごとに少しずらす (畑のマス目に見えないように)。決まった値なので、開き直しても同じ並び
+      cell.style.setProperty('--jx', (((i * 37) % 11) - 5) * 2 + 'px');
+      cell.style.setProperty('--jy', (((i * 53) % 9) - 4) * 3 + 'px');
       const ground = document.createElement('div');
       ground.className = 'ground';
       cell.appendChild(ground);
@@ -143,10 +146,14 @@
     const g = groundEl(i).getBoundingClientRect();
     const L = layerRect || (layerRect = els.plants.getBoundingClientRect());
     const cellW = g.width / 0.92;          // .ground はマスの幅の 92%
-    const w = cellW * 1.6 * window.KusaArt.sizeOf(C.speciesOf(game.cells[i])); // 草ごとの大きさ (looks.js)
+    const size = C.fieldSize(game);
+    const row = Math.floor(i / size);
+    const depth = 0.88 + 0.12 * (row / Math.max(1, size - 1)); // 奥 (上) の列ほど少し小さく
+    const w = cellW * 1.55 * depth * window.KusaArt.sizeOf(C.speciesOf(game.cells[i])); // 草ごとの大きさ (looks.js)
     const h = w * (window.KusaArt.H / window.KusaArt.W);
     const baseX = g.left + g.width / 2 - L.left;
-    const baseY = g.top + g.height / 2 - L.top;
+    // 絵のいちばん下は細い根。見た目の株元が輪や影の中に収まるよう、根を輪の中心より少し手前に置く
+    const baseY = g.top + g.height * 0.66 - L.top;
     sp.style.width = w.toFixed(1) + 'px';
     sp.style.height = h.toFixed(1) + 'px';
     sp.style.left = (baseX - w / 2).toFixed(1) + 'px';
@@ -691,16 +698,46 @@
     els.zoom.hidden = false;
   }
 
-  // ---- 背景と空気 ----
-  let backdropSize = '';
-  function drawBackdrop() {
+  // ---- 手前のぼけた葉 ----
+  // 画面の四隅に、手前にある葉をぼかして置く (奥行きが出る)。動かないので1回だけ描き、大きさが変わったら描き直す。
+  // ぼかしは canvas に焼き込む (CSS の filter で動く物の上にかけると、遅い端末で重くなった)
+  const FOLIAGE = [
+    // [草の id, 横 (画面の幅に対する割合), 縦 (高さに対する割合), 大きさ (幅に対する割合), 回転 (度)]
+    // 下の木の板 (高さ 約 90px) と画面の外に隠れない所に置く
+    ['konmori_shiba', 0.0, 0.17, 0.55, 30],
+    ['fusafusa_shiba', -0.02, 0.58, 0.5, 64],
+    ['hakobe', 0.04, 0.86, 0.5, 18],
+    ['konmori_shiba', 1.0, 0.84, 0.55, -20],
+    ['yotsuba', 1.1, 0.5, 0.4, -58]
+  ];
+  let foliageSize = '';
+  function drawFoliage() {
     const w = window.innerWidth;
     const h = window.innerHeight;
     if (!(w >= 1 && h >= 1)) return; // 一瞬 0 で渡ってくることがある。前の絵のまま
     const key = w + 'x' + h;
-    if (key === backdropSize) return;
-    backdropSize = key;
-    window.KusaArt.linen(document.getElementById('backdrop'), w, h, Math.min(1.5, window.devicePixelRatio || 1));
+    if (key === foliageSize) return;
+    foliageSize = key;
+    const k = Math.min(1.5, window.devicePixelRatio || 1);
+    const cv = document.getElementById('foliage');
+    cv.width = Math.round(w * k);
+    cv.height = Math.round(h * k);
+    const ctx = cv.getContext('2d');
+    FOLIAGE.forEach(([id, fx, fy, fs, rot]) => {
+      const s = C.speciesOf(id);
+      if (!s) return;
+      const img = new Image();
+      img.onload = () => {
+        const size = fs * w * k;
+        ctx.save();
+        ctx.translate(fx * w * k, fy * h * k);
+        ctx.rotate(rot * Math.PI / 180);
+        ctx.filter = 'blur(' + (3.5 * k).toFixed(1) + 'px) brightness(0.78) saturate(1.05)';
+        ctx.drawImage(img, -size / 2, -size * 0.65, size, size * 1.25);
+        ctx.restore();
+      };
+      img.src = window.KusaArt.url(s);
+    });
   }
 
   /** 光の中を漂う細かい粒。数は少なく、動きは CSS (transform と opacity) だけ。 */
@@ -724,16 +761,12 @@
   }
 
   function main() {
-    drawBackdrop();
-    window.addEventListener('resize', () => { drawBackdrop(); placeAll(); });
+    drawFoliage();
+    window.addEventListener('resize', () => { drawFoliage(); placeAll(); });
     // 書体の読み込みなどで台の位置が動いたら、草を置き直す (ずれると草が根元から浮く)
     if (window.ResizeObserver) new ResizeObserver(() => placeAll()).observe(els.stage);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeAll);
-    window.KusaArt.strata(document.getElementById('strata'));
     makeAir();
-    // 土は動かないので1回だけ描く。飾りの草や苔は、合成用の草の根元 (各マス) を避けて置く
-    const size = C.fieldSize(game);
-    window.KusaArt.soil(document.getElementById('soil'), 7, { cols: size, rows: size, baseY: 0.78 });
     buildBoard();
     render();
 

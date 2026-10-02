@@ -14,7 +14,8 @@
 </head>
 <body>
 
-<canvas id="backdrop" aria-hidden="true"></canvas>
+<div id="field" aria-hidden="true"></div>
+<canvas id="foliage" aria-hidden="true"></canvas>
 <div id="app">
   <header id="topbar">
     <h1 class="title">
@@ -30,13 +31,7 @@
   </header>
 
   <main id="stage">
-    <div id="diorama">
-      <div id="slab">
-        <canvas id="soil" width="760" height="1360" aria-hidden="true"></canvas>
-        <div id="board" role="grid" aria-label="牧場"></div>
-        <div class="slab-front" aria-hidden="true"><canvas id="strata" width="760" height="220"></canvas></div>
-      </div>
-    </div>
+    <div id="board" role="grid" aria-label="牧場"></div>
     <div id="plants"></div>
     <div id="air" aria-hidden="true"></div>
     <p id="message" class="message" aria-live="polite">種をまいて、同じ草を重ねてみよう。</p>
