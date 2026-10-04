@@ -300,21 +300,45 @@
 
   function speciesOf(id) { return BY_ID[id] || null; }
 
+  /** その草が種から生えるようになる牧場の番号 (どの牧場にも無ければ -1)。 */
+  function unlockStep(id) {
+    for (let i = 0; i < FIELD_STEPS.length; i++) {
+      if (FIELD_STEPS[i].unlock.indexOf(BY_ID[id].name) >= 0) return i;
+    }
+    return -1;
+  }
+
   /**
-   * 未発見の草に出すヒント。答えそのものは出さない。
-   * 系統の草は、ひとつ前の段を見つけていれば「それを2つ重ねる」と分かる。
+   * 未発見の草に出すヒント。答え (その草の名前) は出さない。
+   * 手がかりは、いま分かっていることに合わせて具体的になる:
+   *   系統の草: ひとつ前を見つけていれば「それを2つ重ねる」。まだなら、いちばん進んだ草から「あと何段階」
+   *   最初の草: 種から生えるか、牧場を広げないと生えないか
+   *   特殊合成: 材料を1つ見つければ「その草と、もう1種」、両方見つければ組み合わせそのもの
    */
   function hint(game, id) {
     const s = BY_ID[id];
-    if (s.lineage) {
-      if (s.level === 1) return '牧場に種をまくと生えてくるかも。';
-      const prev = SPECIES.filter(function (p) { return p.next === id; })[0];
-      return game.discovered[prev.id] ? prev.name + 'を2つ重ねてみよう。' : '同じ草を重ねて育てた先にある。';
+    if (s.lineage && s.level > 1) {
+      const chain = SPECIES.filter(function (p) { return p.lineage === s.lineage; });
+      const prev = chain[s.level - 2];
+      if (game.discovered[prev.id]) return '「' + prev.name + '」を2つ重ねてみよう。';
+      // 見つけた中でいちばん進んだ草 (何も無ければ、系統の最初の草) から、あと何段階か
+      let best = chain[0];
+      chain.forEach(function (p) { if (p.level < s.level && game.discovered[p.id]) best = p; });
+      return '「' + best.name + '」から、あと' + (s.level - best.level) + '段階育てた先にいる。';
+    }
+    const step = unlockStep(id);
+    if (step >= 0) {
+      return step <= game.step ? '種をまくと生えてくる。' : '牧場を「' + FIELD_STEPS[step].name + '」に広げると、種から生えてくる。';
     }
     for (let i = 0; i < RECIPES.length; i++) {
-      if (RECIPES[i][2] === s.name) return RECIPES[i][3] || '異なる草を組み合わせよう。';
+      if (RECIPES[i][2] !== s.name) continue;
+      const a = findByName(RECIPES[i][0]), b = findByName(RECIPES[i][1]);
+      const have = [a, b].filter(function (m) { return game.discovered[m.id]; });
+      if (have.length === 2) return '「' + a.name + '」と「' + b.name + '」を重ねてみよう。';
+      if (have.length === 1) return '「' + have[0].name + '」と、もう1種を重ねてみよう。';
+      return RECIPES[i][3] || '異なる草を組み合わせよう。';
     }
-    return 'まだ見つけ方が分からない。';
+    return 'どこで出会えるのか、まだ分かっていない。';
   }
 
   // ---- 保存 ----------------------------------------------------------

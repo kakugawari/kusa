@@ -472,6 +472,24 @@ async function run() {
       await themed.close();
     }
 
+    // ------------------------------------------------ 図鑑のヒント
+    section('図鑑のヒント');
+    const hctx = await browser.newContext({ ...PHONE });
+    const hp = await hctx.newPage();
+    await hp.goto(URL);
+    await hp.waitForFunction(() => window.__app);
+    await hp.evaluate(() => window.__app.setGame(window.Core.createGame()));
+    await hp.locator('#btnBook').click();
+    const hints = await hp.evaluate(() => [...document.querySelectorAll('#bookList .group-grid')].map((g) => ({
+      title: g.previousElementSibling.textContent,
+      notes: [...g.querySelectorAll('.entry.unknown .entry-note')].map((n) => n.textContent)
+    })));
+    for (const g of hints) ok(new Set(g.notes).size === g.notes.length, `${g.title}: 未発見の草のヒントがどれも違う (${g.notes.length} 件)`);
+    const all = hints.flatMap((g) => g.notes);
+    ok(all.every((t) => t.startsWith('ヒント：') && t.length > 12), '未発見のヒントはどれも、手がかりのある文になっている');
+    ok(!all.some((t) => t.includes('同じ草を重ねて育てた先にある')), '前の、どの草にも同じ文を出すヒントが残っていない');
+    await hctx.close();
+
     // ------------------------------------------------ 拡大させない / 背景がしずんでいる
     section('拡大させない・背景');
     const zctx = await browser.newContext({ ...PHONE });

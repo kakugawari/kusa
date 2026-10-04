@@ -244,12 +244,60 @@ test('最初の目標: 種をまいて芝生を重ねていくと、レアの黄
   assert.strictEqual(Core.speciesOf(gold).rarity, 2);
 });
 
-test('ヒントは答えの名前を出さず、ひとつ前を見つけていれば重ね方を教える', () => {
+test('ヒントは答えの名前を出さず、いま分かっていることに合わせて具体的になる', () => {
   const g = Core.createGame();
-  assert.strictEqual(Core.hint(g, id('ふさふさ芝生')), '同じ草を重ねて育てた先にある。');
+  // 系統の2〜4段目は、段ごとに違う手がかりが出る (前は全部同じ文だった)
+  const shiba = ['ふさふさ芝生', 'こんもり芝生', '黄金芝生'].map((n) => Core.hint(g, id(n)));
+  assert.strictEqual(new Set(shiba).size, 3, `段ごとに違うヒント: ${shiba.join(' / ')}`);
+  shiba.forEach((h) => assert.ok(h.includes('ちび芝生'), `起点の草が分かる: ${h}`));
+  assert.ok(Core.hint(g, id('黄金芝生')).includes('3'), 'あと何段階かが分かる');
   Core.place(g, 0, id('ちび芝生'));
-  assert.strictEqual(Core.hint(g, id('ふさふさ芝生')), 'ちび芝生を2つ重ねてみよう。');
-  Core.SPECIES.forEach((s) => assert.ok(!Core.hint(g, s.id).includes(s.name), `${s.name} のヒントに名前が出ている`));
+  assert.strictEqual(Core.hint(g, id('ふさふさ芝生')), '「ちび芝生」を2つ重ねてみよう。');
+  assert.ok(Core.hint(g, id('こんもり芝生')).includes('あと2段階'), Core.hint(g, id('こんもり芝生')));
+  Core.place(g, 1, id('ふさふさ芝生'));
+  assert.strictEqual(Core.hint(g, id('こんもり芝生')), '「ふさふさ芝生」を2つ重ねてみよう。');
+  assert.ok(Core.hint(g, id('黄金芝生')).includes('「ふさふさ芝生」から、あと2段階'), Core.hint(g, id('黄金芝生')));
+});
+
+test('最初の草のヒントは、種から生えるか、牧場を広げないと生えないかを正しく言う', () => {
+  const g = Core.createGame();
+  ['ちび芝生', '三つ葉', 'ハコベ'].forEach((n) => assert.strictEqual(Core.hint(g, id(n)), '種をまくと生えてくる。', n));
+  // 最初は生えない草に「種をまくと生える」と言ってはいけない (前は言っていた)
+  const locked = Core.SPECIES.filter((s) => s.level === 1 && !Core.unlockedSpecies(g).includes(s.id) && !Core.RECIPES.some((r) => r[2] === s.name) && s.name !== '雑草');
+  assert.ok(locked.length >= 4, '芽 2 つ・水辺の草・光る草');
+  locked.forEach((s) => assert.ok(!Core.hint(g, s.id).includes('種をまくと'), `${s.name}: ${Core.hint(g, s.id)}`));
+  assert.ok(Core.hint(g, id('光る草')).includes('幻想の牧場'));
+  assert.ok(Core.hint(g, id('水辺の草')).includes('第3牧場'));
+  // 広げたあとは、種をまくと生える
+  g.step = 1;
+  assert.strictEqual(Core.hint(g, Core.SPECIES.filter((s) => s.name === '芽')[0].id), '種をまくと生えてくる。');
+});
+
+test('特殊合成のヒントは、材料を見つけるほど具体的になる', () => {
+  const g = Core.createGame();
+  const base = Core.RECIPES.filter((r) => r[2] === 'ホトケノザ')[0][3];
+  assert.strictEqual(Core.hint(g, id('ホトケノザ')), base);
+  Core.place(g, 0, id('三つ葉'));
+  assert.strictEqual(Core.hint(g, id('ホトケノザ')), '「三つ葉」と、もう1種を重ねてみよう。');
+  Core.place(g, 1, id('ハコベ'));
+  assert.strictEqual(Core.hint(g, id('ホトケノザ')), '「三つ葉」と「ハコベ」を重ねてみよう。');
+  // 出どころが決まっていない草は、そう言う
+  assert.ok(Core.hint(g, id('雑草')).includes('分かっていない'));
+});
+
+test('どの草のヒントも空でなく、どんな状態でも答えの名前を出さない', () => {
+  const states = [Core.createGame()];
+  const some = Core.createGame();
+  ['ちび芝生', '三つ葉', 'ハコベ', 'ふさふさ芝生', 'ヒナギク'].forEach((n, i) => Core.place(some, i, id(n)));
+  states.push(some);
+  const all = Core.createGame();
+  Core.SPECIES.forEach((s) => { all.discovered[s.id] = true; });
+  states.push(all);
+  states.forEach((g) => Core.SPECIES.forEach((s) => {
+    const h = Core.hint(g, s.id);
+    assert.ok(h && h.endsWith('。'), `${s.name} のヒントが文になっていない: ${h}`);
+    assert.ok(!h.includes(s.name), `${s.name} のヒントに名前が出ている: ${h}`);
+  }));
 });
 
 test('保存して戻すと同じ状態になり、壊れたデータや知らない草は捨てる', () => {
