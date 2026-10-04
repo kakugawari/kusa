@@ -10,7 +10,7 @@
 
   const C = window.Core;
   const SAVE_KEY = 'kusa.save.v1';
-  const VERSION = '2026-10-04e'; // 直したら上げる。実機で「届いているか」を確かめるため、図鑑のいちばん下に出す
+  const VERSION = '2026-10-04f'; // 直したら上げる。実機で「届いているか」を確かめるため、図鑑のいちばん下に出す
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -179,9 +179,9 @@
       if (sprites[i]) sprites[i].classList.toggle('selected', i === selected);
     }
     const c = C.collection(game);
-    els.bookCount.textContent = c.found + ' / ' + c.total;
+    fitNum('book', els.bookCount, c.found + '/' + c.total, 15);
     els.bookMeter.style.width = (100 * c.found / c.total).toFixed(1) + '%';
-    els.coins.textContent = String(game.coins);
+    fitNum('coins', els.coins, coinText(game.coins), 17);
     els.btnSell.classList.toggle('armed', selected >= 0);
   }
 
@@ -382,6 +382,30 @@
   }
 
   function pad(n) { return String(n).padStart(3, '0'); }
+
+  // ---- 札の数字 ----
+  /** コインの表示。1 万以上は「1.2万」と短くする (札の白地は 4 文字ぶんしか無い) */
+  function coinText(n) {
+    if (n < 10000) return String(n);
+    const man = n / 10000;
+    return (man < 100 ? man.toFixed(1).replace(/\.0$/, '') : String(Math.floor(man))) + '万';
+  }
+
+  const numShown = {};
+  /**
+   * 札の数字を書く。枠 (絵の白地) に入りきらなければ font-size を縮める (折り返さない)。
+   * 変わったときだけ測る (render は毎コマ呼ばれる)。書体が読み込まれると幅が変わるので、そのときは測り直す
+   */
+  function fitNum(key, el, text, max) {
+    if (numShown[key] === text) return;
+    numShown[key] = text;
+    el.textContent = text;
+    const box = el.parentElement;
+    let size = max;
+    box.style.fontSize = size + 'px';
+    const used = () => [].reduce.call(box.children, (sum, c) => sum + c.getBoundingClientRect().width, 0) + 2 * (box.children.length - 1);
+    while (size > 9 && used() > box.clientWidth) { size -= 0.5; box.style.fontSize = size + 'px'; }
+  }
 
   // ---- 操作の中身 ----
   async function run(task) {
@@ -738,7 +762,7 @@
     for (const t of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(t, (e) => e.preventDefault());
     // 書体の読み込みなどで台の位置が動いたら、草を置き直す (ずれると草が根元から浮く)
     if (window.ResizeObserver) new ResizeObserver(() => placeAll()).observe(els.stage);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeAll);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { numShown.book = numShown.coins = null; render(); placeAll(); });
     makeAir();
     buildBoard();
     render();

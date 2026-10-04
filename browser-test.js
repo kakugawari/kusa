@@ -206,7 +206,7 @@ async function run() {
     ok(planted === 1, `押すと草が1つ生える (${planted})`);
     ok(await phone.locator('#discover').isVisible(), '初めての草なら「発見！」が出る');
     await closeDiscover();
-    ok((await phone.locator('#bookCount').textContent()).startsWith('1 /'), '図鑑の数が 1 になる');
+    ok((await phone.locator('#bookCount').textContent()).startsWith('1/'), '図鑑の数が 1 になる');
 
     section('新しい種が加わる');
     // ふさふさ芝生を 2 つ重ねて、こんもり芝生を初めて見つける → タンポポの芽の種が加わる
@@ -452,7 +452,38 @@ async function run() {
     ok(tl[0].startsWith('url(') && tl[1] === 'none', `植えたマスにだけ耕した土がある (${tl.join(' / ')})`);
     // 数字は札の絵に描かれていない (消してある) ので、上に書いた数字が見えていること
     const nums = await phone.evaluate(() => [document.getElementById('bookCount').textContent, document.getElementById('coins').textContent]);
-    ok(/^\d+ \/ \d+$/.test(nums[0]) && /^\d+$/.test(nums[1]), `図鑑とコインの数字が札に出ている (${nums.join(' / ')})`);
+    ok(/^\d+\/\d+$/.test(nums[0]) && /^\d+$/.test(nums[1]), `図鑑とコインの数字が札に出ている (${nums.join(' / ')})`);
+
+    section('札の数字');
+    // 桁が増えても、数字は 1 行で枠に収まり、メーター・金貨・花に触れない (前は「28 /」「35」と 2 行に割れてメーターに重なった)
+    for (const [found, coins] of [[7, 55], [28, 4055], [35, 9999], [35, 12345], [35, 123456], [35, 12345678]]) {
+      const m = await phone.evaluate(([found, coins]) => {
+        const C = window.Core, g = C.createGame();
+        C.SPECIES.slice(0, found).forEach((sp) => { g.discovered[sp.id] = true; });
+        g.coins = coins;
+        window.__app.setGame(g);
+        const R = (e) => e.getBoundingClientRect();
+        const book = R(document.querySelector('.chip-book')), coin = R(document.querySelector('.chip-coin'));
+        const spans = (sel) => [...document.querySelector(sel).children].map(R);
+        const bookKids = spans('.chip-book .plate-num'), coinKids = spans('.chip-coin .plate-num');
+        const bc = document.getElementById('bookCount'), cc = document.getElementById('coins');
+        return {
+          text: bc.textContent + ' / ' + cc.textContent,
+          bookOneLine: R(bc).height < parseFloat(getComputedStyle(bc).fontSize) * 1.6,
+          coinOneLine: R(cc).height < parseFloat(getComputedStyle(cc).fontSize) * 1.6,
+          bookLeft: (Math.min(...bookKids.map((r) => r.left)) - book.left) / book.width,
+          bookRight: (book.right - Math.max(...bookKids.map((r) => r.right))) / book.width,
+          bookBottom: Math.max(...bookKids.map((r) => r.bottom)),
+          meterTop: R(document.querySelector('.meter')).top,
+          coinLeft: (Math.min(...coinKids.map((r) => r.left)) - coin.left) / coin.width,
+          coinRight: (coin.right - Math.max(...coinKids.map((r) => r.right))) / coin.width
+        };
+      }, [found, coins]);
+      ok(m.bookOneLine && m.coinOneLine, `数字が 1 行 (${m.text})`);
+      ok(m.bookLeft >= 0.46 && m.bookRight >= 0.07, `図鑑の数字が「図鑑」の文字と右の葉のあいだに収まる (左 ${m.bookLeft.toFixed(2)} / 右 ${m.bookRight.toFixed(2)})`);
+      ok(m.bookBottom <= m.meterTop, `図鑑の数字がメーターに重ならない (${Math.round(m.bookBottom)} <= ${Math.round(m.meterTop)})`);
+      ok(m.coinLeft >= 0.4 && m.coinRight >= 0.17, `コインの数字が金貨と右の花に触れない (左 ${m.coinLeft.toFixed(2)} / 右 ${m.coinRight.toFixed(2)})`);
+    }
 
     section('草むらと目印');
     // 選ぶと、重ねられる相手 (同じ草) のマスが光る。まだ見つけていない特殊合成の相手は光らない

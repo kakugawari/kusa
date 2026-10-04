@@ -105,9 +105,12 @@ html, body { height: 100vh; position: relative; }
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
-.chip-book .plate-num { left: 53%; right: 8%; top: 17%; bottom: 39%; font-size: 16px; }
-.chip-book .plate-num small { font-size: 11px; margin-left: 2px; }
-.chip-coin .plate-num { left: 44%; right: 24%; top: 26%; bottom: 27%; font-size: 17px; }
+/* 数字の枠は絵の白地いっぱい (図鑑: 「図鑑」の文字から右の葉まで / コイン: 金貨から右上の葉まで)。
+ * 桁が増えて入りきらないときは、app.js の fitNum が font-size を縮める。折り返さない */
+.plate-num { white-space: nowrap; }
+.chip-book .plate-num { left: 49%; right: 9%; top: 17%; bottom: 39%; font-size: 16px; }
+.chip-book .plate-num small { font-size: 0.7em; margin-left: 2px; }
+.chip-coin .plate-num { left: 42%; right: 20%; top: 22%; bottom: 31%; font-size: 17px; }
 .meter {
   position: absolute;
   left: 22%;
