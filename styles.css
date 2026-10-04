@@ -48,6 +48,9 @@ body {
   user-select: none;
 }
 
+/* 連打すると iOS が「ダブルタップ」と見なして画面が拡大する。どこを叩いても拡大させない */
+* { touch-action: manipulation; }
+
 button { font: inherit; color: inherit; }
 button:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; }
 
@@ -125,7 +128,7 @@ html, body { height: 100vh; position: relative; }
 #field {
   position: fixed;
   inset: 0;
-  background: #4a3a24 url("./img/ground.webp") center / cover no-repeat;
+  background: #4a3a24 url("./img/ground-dim.webp") center / cover no-repeat;
   pointer-events: none;
 }
 #field::after {

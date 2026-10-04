@@ -381,7 +381,7 @@ async function run() {
     ok(layout.left >= 0 && layout.right <= 430, `牧場が画面の幅に収まる (${Math.round(layout.left)}〜${Math.round(layout.right)})`);
     ok(layout.bottom <= layout.barTop && layout.top >= layout.topBottom, `牧場が上の札と下の木の板のあいだに収まる (${Math.round(layout.top)}〜${Math.round(layout.bottom)})`);
     ok((layout.bottom - layout.top) / layout.h >= 0.7, `牧場が画面の中で大きい (高さ ${Math.round(layout.bottom - layout.top)}px / 画面 ${layout.h}px)`);
-    ok(/ground\.webp/.test(layout.bg), '地面の写真を背景に敷いている');
+    ok(/ground-dim\.webp/.test(layout.bg), "地面の写真 (しずめた版) を背景に敷いている");
     // 画面全体の層に filter をかけると、合成の演出のたびに塗り直されて遅い端末で重くなった (ぼかしは canvas に焼き込む)
     ok(layout.filters.every((f) => f === 'none'), `背景に filter を使っていない (${layout.filters.join(' / ')})`);
     // 草を植えたマスには耕した土を敷く (まわりの地面の草と見分ける)。空いたマスには敷かない
@@ -471,6 +471,37 @@ async function run() {
       ok(colors.bg !== colors.fg, `${scheme}: 文字と背景の色が違う (${colors.bg} / ${colors.fg})`);
       await themed.close();
     }
+
+    // ------------------------------------------------ 拡大させない / 背景がしずんでいる
+    section('拡大させない・背景');
+    const zctx = await browser.newContext({ ...PHONE });
+    const zp = await zctx.newPage();
+    await zp.goto(URL);
+    await zp.waitForFunction(() => window.__app);
+    const zoom = await zp.evaluate(() => ({
+      viewport: document.querySelector('meta[name="viewport"]').content,
+      touch: ['#btnPlant', '#btnSell', '#btnBook', '#stage', '#actions'].map((q) => [q, getComputedStyle(document.querySelector(q)).touchAction]),
+      field: getComputedStyle(document.getElementById('field')).backgroundImage
+    }));
+    ok(/user-scalable=no/.test(zoom.viewport) && /maximum-scale=1/.test(zoom.viewport), `viewport で拡大を止めている (${zoom.viewport})`);
+    for (const [q, t] of zoom.touch) ok(t === 'manipulation' || t === 'none', `${q} の touch-action が ${t} (ダブルタップ拡大が起きない)`);
+    // iOS はピンチ拡大を viewport で止められない。gesturestart を止めている
+    const gesture = await zp.evaluate(() => { const e = new Event('gesturestart', { cancelable: true }); document.dispatchEvent(e); return e.defaultPrevented; });
+    ok(gesture, 'gesturestart (ピンチ拡大) を止めている');
+    // 連打しても、押した回数ぶん反応する (touchend を止めて click を消していない)
+    // 新種の発見は札が出て操作を止める (仕様)。連打だけを見たいので、先に全種を発見済みにする
+    await zp.evaluate(() => {
+      const g = window.Core.createGame();
+      for (const sp of window.Core.SPECIES) g.discovered[sp.id] = true;
+      window.__app.setGame(g);
+    });
+    const before = await zp.evaluate(() => window.__app.game().cells.filter(Boolean).length);
+    for (let i = 0; i < 5; i++) await zp.locator('#btnPlant').click({ delay: 10 });
+    const after = await zp.evaluate(() => window.__app.game().cells.filter(Boolean).length);
+    ok(after - before === 5, `「種をまく」を速く5回押すと5つ生える (${before} → ${after})`);
+    // 背景は、植えた草より彩度が低くて暗い (草と混ざらない)
+    ok(/ground-dim\.webp/.test(zoom.field), `牧場の背景はしずめた版 (${zoom.field.slice(-40)})`);
+    await zctx.close();
 
     // ------------------------------------------------ アイコン (用意していれば)
     section('アイコン');

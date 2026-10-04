@@ -10,7 +10,7 @@
 
   const C = window.Core;
   const SAVE_KEY = 'kusa.save.v1';
-  const VERSION = '2026-10-02c'; // 直したら上げる。実機で「届いているか」を確かめるため、図鑑のいちばん下に出す
+  const VERSION = '2026-10-04a'; // 直したら上げる。実機で「届いているか」を確かめるため、図鑑のいちばん下に出す
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -436,21 +436,23 @@
   }
 
   function plant() {
-    return run(async () => {
-      selected = -1;
-      const before = Object.assign({}, game.discovered);
-      const i = C.plant(game);
-      if (i < 0) {
-        say('牧場がいっぱい。重ねるか、売って場所を空けよう。');
-        return;
-      }
-      saveSoon();
-      render();
-      const id = game.cells[i];
-      say(C.speciesOf(id).name + 'が生えた。');
-      await Promise.all([grow(i), dirt(baseOf(i), 5)]);
-      if (!before[id]) await showDiscover(id, false);
-    });
+    // 連打に付いてくる: 生える演出は 1 本ずつ独立しているので、操作は止めない
+    // (止めると、演出の 0.62 秒のあいだ押した分が捨てられる)。止めるのは発見の札を出すときだけ
+    if (busy) return Promise.resolve();
+    selected = -1;
+    const before = Object.assign({}, game.discovered);
+    const i = C.plant(game);
+    if (i < 0) {
+      say('牧場がいっぱい。重ねるか、売って場所を空けよう。');
+      return Promise.resolve();
+    }
+    saveSoon();
+    render();
+    const id = game.cells[i];
+    say(C.speciesOf(id).name + 'が生えた。');
+    const shown = Promise.all([grow(i), dirt(baseOf(i), 5)]);
+    if (before[id]) return shown;
+    return run(async () => { await shown; await showDiscover(id, false); });
   }
 
   // ---- 指の操作 ----
@@ -723,6 +725,10 @@
   function main() {
     document.getElementById('version').textContent = '版 ' + VERSION + ' / 見えている高さ ' + window.innerHeight;
     window.addEventListener('resize', placeAll);
+    // ピンチ拡大を止める (iOS は viewport の user-scalable を無視する)。
+    // 連打のダブルタップ拡大は CSS の touch-action: manipulation が止める。
+    // touchend を止める手は使わない (2度目のタップの click まで消え、連打で押し損ねる)
+    for (const t of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(t, (e) => e.preventDefault());
     // 書体の読み込みなどで台の位置が動いたら、草を置き直す (ずれると草が根元から浮く)
     if (window.ResizeObserver) new ResizeObserver(() => placeAll()).observe(els.stage);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeAll);
