@@ -30,7 +30,11 @@ const BASE = 0.94;   // 根元の高さ (箱の上から)
 /** 届いたシート。cols x rows のマスに1本ずつ並んでいる */
 const SHEETS = {
   s1: { file: 'img/source/plants-sheet-01.png', cols: 5, rows: 4 },
-  s2: { file: 'img/source/plants-sheet-02.png', cols: 5, rows: 4 }
+  s2: { file: 'img/source/plants-sheet-02.png', cols: 5, rows: 4 },
+  // 光る草・綿毛の大群生・幸運の光草 (仮だった 3 つの本物)。
+  // dropSmall: マス ('段-列') ごとに「これより小さい塊は捨てる」大きさ。半透明の光の粒は、背景のマゼンタと混ざって
+  // 色が戻らず桃色の輪になる。捨てて、recipe の dots (柔らかい光の粒) で描き直す
+  s3: { file: 'img/source/plants-sheet-03.png', cols: 3, rows: 1, dropSmall: { '1-1': 1500, '1-2': 250, '1-3': 1500 } }
 };
 
 /**
@@ -55,16 +59,16 @@ const RECIPES = {
   susuki: { clean: 0.9, cell: ['s2', 2, 1] },
   ooki_susuki: { clean: 0.9, cell: ['s2', 2, 2] },
   ougon_susuki: { clean: 0.9, filter: 'hue-rotate(12deg) saturate(0.95)', cell: ['s2', 2, 4], glow: 'rgba(255,200,80,0.35)' },
-  hikaru_kusa: { cell: ['s1', 4, 5], filter: 'hue-rotate(-75deg) saturate(0.9) brightness(1.05)', glow: 'rgba(150,255,170,0.55)', note: '仮: 色を変えて作った' },
+  hikaru_kusa: { clean: 0.9, cell: ['s3', 1, 1], dots: { n: 9, color: '#d6fff4' } },
   hoshi_kusa: { cell: ['s2', 4, 2] },
   gekkou_kusa: { cell: ['s2', 4, 3] },
   niji_kusa: { cell: ['s2', 4, 4] },
   zassou: { cell: ['s1', 4, 3] },
   mizube_kusa: { clean: 0.9, cell: ['s2', 2, 5] },
   clover_shiba: { cell: ['s2', 3, 1] },
-  watage_daigunsei: { cell: ['s1', 2, 3], add: [[['s1', 2, 3], -0.2, 0.8], [['s1', 2, 3], 0.22, 0.85]] },
+  watage_daigunsei: { clean: 0.9, cell: ['s3', 1, 2] },
   ougon_sougen: { clean: 0.9, filter: 'hue-rotate(12deg) saturate(0.95)', cell: ['s2', 3, 5], glow: 'rgba(255,205,90,0.4)' },
-  kouun_hikarigusa: { cell: ['s2', 3, 2], filter: 'saturate(1.25) brightness(1.15)', glow: 'rgba(170,255,140,0.75)', dots: { n: 12, color: '#fffbd0' }, note: '仮: 幸運のクローバーを光らせて作った' },
+  kouun_hikarigusa: { clean: 0.9, cell: ['s3', 1, 3], dots: { n: 11, color: '#fff2b0' } },
   hotaru_kusa: { cell: ['s2', 4, 1] },
   tanpopo_me: { cell: ['s2', 1, 1] },
   susuki_me: { clean: 0.9, cell: ['s2', 1, 2] },
@@ -149,12 +153,13 @@ function cutSheetInPage(sheet) {
       for (let i = 0; i < W * H; i++) {
         if (alpha[i] < 0.5 || label[i] >= 0) continue;
         const id = comps.length;
-        let n = 0, sx = 0, sy = 0;
+        let n = 0, sx = 0, sy = 0, bx0 = W, by0 = H, bx1 = -1, by1 = -1;
         stack.push(i); label[i] = id;
         while (stack.length) {
           const j = stack.pop();
           const jx = j % W, jy = (j / W) | 0;
           n++; sx += jx; sy += jy;
+          if (jx < bx0) bx0 = jx; if (jx > bx1) bx1 = jx; if (jy < by0) by0 = jy; if (jy > by1) by1 = jy;
           const nb = [j - 1, j + 1, j - W, j + W];
           for (let q = 0; q < 4; q++) {
             const k = nb[q];
@@ -163,11 +168,30 @@ function cutSheetInPage(sheet) {
             if (alpha[k] >= 0.5 && label[k] < 0) { label[k] = id; stack.push(k); }
           }
         }
-        comps.push({ n: n, cx: sx / n, cy: sy / n });
+        comps.push({ n: n, cx: sx / n, cy: sy / n, x0: bx0, y0: by0, x1: bx1, y1: by1 });
       }
       // 塊の重心がどのマスにあるか
       const cw = W / sheet.cols, ch = H / sheet.rows;
-      const cellOf = comps.map((cp) => cp.n < 12 ? -1 : Math.min(sheet.rows - 1, Math.floor(cp.cy / ch)) * sheet.cols + Math.min(sheet.cols - 1, Math.floor(cp.cx / cw)));
+      const centroidCell = (cp) => Math.min(sheet.rows - 1, Math.floor(cp.cy / ch)) * sheet.cols + Math.min(sheet.cols - 1, Math.floor(cp.cx / cw));
+      // 大きな塊 (草の本体) はそのマス。小さな塊 (飛んだ綿毛の種・光の粒) は、いちばん近い草の本体の枠 (外接する四角) に
+      // 入るならその草のマスへ。重心のマスで決めると、となりの草の絵に紛れ込む
+      // (3 つ並べたシートで、タンポポの左へ飛んだ種が、左隣の草に付いた)
+      const BIG = 1500;
+      const bigs = comps.filter((cp) => cp.n >= BIG);
+      const boxDist = (cp, b) => Math.hypot(Math.max(b.x0 - cp.cx, 0, cp.cx - b.x1), Math.max(b.y0 - cp.cy, 0, cp.cy - b.y1));
+      const cellKey = (cell) => (Math.floor(cell / sheet.cols) + 1) + '-' + (cell % sheet.cols + 1);
+      const cellOf = comps.map((cp) => {
+        if (cp.n < 12) return -1;
+        let cell = centroidCell(cp);
+        if (cp.n < BIG && bigs.length) {
+          let best = bigs[0], bd = Infinity;
+          bigs.forEach((b) => { const dd = boxDist(cp, b); if (dd < bd) { bd = dd; best = b; } });
+          cell = centroidCell(best);
+        }
+        // このマスで捨てる小さい塊 (sheet.dropSmall)
+        const limit = sheet.dropSmall[cellKey(cell)];
+        return limit && cp.n < limit ? -1 : cell;
+      });
       // 半透明のふち (0 < a < 0.5) は、となりの塊のマスに入れる
       const owner = new Int32Array(W * H).fill(-1);
       for (let i = 0; i < W * H; i++) if (label[i] >= 0) owner[i] = cellOf[label[i]];
@@ -201,7 +225,7 @@ function cutSheetInPage(sheet) {
           od.data[q] = px[p]; od.data[q + 1] = px[p + 1]; od.data[q + 2] = px[p + 2]; od.data[q + 3] = px[p + 3];
         }
         ox.putImageData(od, 0, 0);
-        out[(Math.floor(cell / sheet.cols) + 1) + '-' + (cell % sheet.cols + 1)] = one.toDataURL('image/png');
+        out[cellKey(cell)] = one.toDataURL('image/png');
       }
       resolve({ cells: out, background: B });
     };
@@ -309,7 +333,7 @@ async function main() {
   fs.mkdirSync(path.join(ROOT, 'img/plants'), { recursive: true });
   const cells = {};
   for (const [key, sh] of Object.entries(SHEETS)) {
-    const res = await page.evaluate(cutSheetInPage, { url: `http://localhost:${PORT}/${sh.file}`, cols: sh.cols, rows: sh.rows });
+    const res = await page.evaluate(cutSheetInPage, { url: `http://localhost:${PORT}/${sh.file}`, cols: sh.cols, rows: sh.rows, dropSmall: sh.dropSmall || {} });
     console.log(`${sh.file}: 背景の色 rgb(${res.background.join(',')}) / ${Object.keys(res.cells).length} 本`);
     for (const [cell, data] of Object.entries(res.cells)) {
       cells[key + ':' + cell] = data;
