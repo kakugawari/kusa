@@ -10,7 +10,7 @@
 
   const C = window.Core;
   const SAVE_KEY = 'kusa.save.v1';
-  const VERSION = '2026-10-04g'; // 直したら上げる。実機で「届いているか」を確かめるため、図鑑のいちばん下に出す
+  const VERSION = '2026-10-04h'; // 直したら上げる。実機で「届いているか」を確かめるため、図鑑のいちばん下に出す
 
   const $ = (id) => document.getElementById(id);
   const els = {

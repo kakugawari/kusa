@@ -443,7 +443,7 @@ async function run() {
     ok(layout.left >= 0 && layout.right <= 430, `牧場が画面の幅に収まる (${Math.round(layout.left)}〜${Math.round(layout.right)})`);
     ok(layout.bottom <= layout.barTop && layout.top >= layout.topBottom, `牧場が上の札と下の木の板のあいだに収まる (${Math.round(layout.top)}〜${Math.round(layout.bottom)})`);
     ok((layout.bottom - layout.top) / layout.h >= 0.7, `牧場が画面の中で大きい (高さ ${Math.round(layout.bottom - layout.top)}px / 画面 ${layout.h}px)`);
-    ok(/ground-soil\.webp/.test(layout.bg), "地面の写真 (草むらを土に置き換えた版) を背景に敷いている");
+    ok(/ground\.webp/.test(layout.bg), "地面の写真 (届いた昼の絵そのまま) を背景に敷いている");
     // 画面全体の層に filter をかけると、合成の演出のたびに塗り直されて遅い端末で重くなった (ぼかしは canvas に焼き込む)
     ok(layout.filters.every((f) => f === 'none'), `背景に filter を使っていない (${layout.filters.join(' / ')})`);
     // 草を植えたマスには耕した土を敷く (まわりの地面の草と見分ける)。空いたマスには敷かない
@@ -610,8 +610,8 @@ async function run() {
     for (let i = 0; i < 5; i++) await zp.locator('#btnPlant').click({ delay: 10 });
     const after = await zp.evaluate(() => window.__app.game().cells.filter(Boolean).length);
     ok(after - before === 5, `「種をまく」を速く5回押すと5つ生える (${before} → ${after})`);
-    // 背景は、草むらを土に置き換えた版 (植えた草と混ざらない)
-    ok(/ground-soil\.webp/.test(zoom.field), `牧場の背景は草むらを土に置き換えた版 (${zoom.field.slice(-40)})`);
+    // 背景は、届いた昼の絵そのまま (加工しない)
+    ok(/ground\.webp/.test(zoom.field), `牧場の背景は届いた昼の絵 (${zoom.field.slice(-40)})`);
     await zctx.close();
 
     // ------------------------------------------------ アイコン (用意していれば)
