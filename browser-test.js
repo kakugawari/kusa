@@ -246,6 +246,30 @@ async function run() {
     ok(!(await phone.locator('#discoverUnlock').isVisible()), '種が増えない発見では、知らせが出ない');
     await closeDiscover();
 
+    section('雑草');
+    // 図鑑に 3 種載っていて、乱数が 0 のとき (= 雑草の目) に種をまく
+    await phone.evaluate(() => {
+      const g = window.Core.createGame();
+      ['chibi_shiba', 'mitsuba', 'hakobe'].forEach((n) => { g.discovered[n] = true; });
+      window.__app.setGame(g);
+      window.__realRandom = Math.random;
+      Math.random = () => 0;
+    });
+    await phone.locator('#btnPlant').click();
+    await phone.locator('#discover').waitFor({ state: 'visible' });
+    await phone.evaluate(() => { Math.random = window.__realRandom; });
+    ok((await phone.locator('#discoverName').textContent()) === '雑草', '雑草が生えて、初めてなら発見の札が出る');
+    await closeDiscover();
+    ok((await phone.evaluate(() => window.__app.game().cells[0])) === 'zassou', '雑草が空きマスに生えた');
+    ok((await phone.locator('#message').textContent()).includes('売って'), `案内が出る (${await phone.locator('#message').textContent()})`);
+    const coinsBefore = await phone.evaluate(() => window.__app.game().coins);
+    await tap(0);
+    await phone.locator('#btnSell').click();
+    await idle();
+    const afterSell = await phone.evaluate(() => ({ cell: window.__app.game().cells[0], coins: window.__app.game().coins, found: !!window.__app.game().discovered.zassou }));
+    ok(afterSell.cell === null && afterSell.coins > coinsBefore, `雑草は売って片づけられる (コイン ${coinsBefore} → ${afterSell.coins})`);
+    ok(afterSell.found, '売っても、図鑑には残る');
+
     section('ドラッグで合成');
     await setup({ 0: chibi, 5: chibi });
     const boardBefore = await phone.locator('#board').boundingBox();

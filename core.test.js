@@ -207,7 +207,7 @@ test('草は空きマスへだけ動かせる', () => {
 test('種をまくと、空きマスに Lv.1 の解放済みの草が1つ生え、満杯なら -1', () => {
   const g = Core.createGame();
   const rng = Core.mulberry32(5);
-  const seeds = [id('ちび芝生'), id('三つ葉'), id('ハコベ')];
+  const seeds = [id('ちび芝生'), id('三つ葉'), id('ハコベ'), id('雑草')]; // 雑草はときどき生える
   for (let i = 0; i < 16; i++) {
     const at = Core.plant(g, rng);
     assert.ok(at >= 0);
@@ -306,9 +306,10 @@ test('新しい種は図鑑の発見で加わり、売っても閉じない。�
   assert.strictEqual(Core.seedLabel('chibi_shiba'), 'ちび芝生');
 });
 
-test('種に加わった草を使えば、雑草のほか 34 種すべてに、詰まらずたどり着ける', () => {
-  // 見つけた草だけで合成できるものを見つけ続け、解放された種も足していく。何度回しても進めば全部届く
+test('種に加わった草と雑草を使えば、35 種すべてに、詰まらずたどり着ける', () => {
+  // 見つけた草だけで合成できるものを見つけ続け、解放された種も足していく。雑草は種まきで出る
   const g = Core.createGame();
+  g.discovered[Core.WEED_ID] = true;
   let progressed = true, rounds = 0;
   while (progressed) {
     progressed = false; rounds++;
@@ -324,8 +325,38 @@ test('種に加わった草を使えば、雑草のほか 34 種すべてに、�
     have.forEach((x) => { if (!g.discovered[x]) { g.discovered[x] = true; progressed = true; } });
   }
   const missing = Core.SPECIES.filter((s) => !g.discovered[s.id]).map((s) => s.name);
-  assert.deepStrictEqual(missing, ['雑草'], `たどり着けない草: ${missing.join(' ')}`);
+  assert.deepStrictEqual(missing, [], `たどり着けない草: ${missing.join(' ')}`);
   assert.ok(rounds >= 3 && rounds <= 8, `解放が段になって進む (${rounds} 回)`);
+});
+
+test('雑草は、図鑑に3種載ってから、ときどき種のかわりに生える。重ねても何も起きない', () => {
+  // 最初は出ない (最初の 1 本が雑草にならない)
+  let early = 0;
+  for (let i = 0; i < 300; i++) {
+    const g = Core.createGame();
+    const rng = Core.mulberry32(i);
+    Core.plant(g, rng);
+    if (g.cells.includes(Core.WEED_ID)) early++;
+  }
+  assert.strictEqual(early, 0, '最初の 1 本は雑草にならない');
+  // 3 種載ったあとは、約 WEED_RATE の割合で出る (種のかわり。マスの数は 1 つ増えるだけ)
+  let weeds = 0, total = 0;
+  for (let i = 0; i < 4000; i++) {
+    const g = Core.createGame();
+    ['chibi_shiba', 'mitsuba', 'hakobe'].forEach((n) => { g.discovered[n] = true; });
+    const at = Core.plant(g, Core.mulberry32(1000 + i));
+    assert.ok(at >= 0 && g.cells.filter(Boolean).length === 1);
+    total++; if (g.cells[at] === Core.WEED_ID) weeds++;
+  }
+  const rate = weeds / total;
+  assert.ok(Math.abs(rate - Core.WEED_RATE) < 0.02, `雑草の割合 ${rate.toFixed(3)} (目安 ${Core.WEED_RATE})`);
+  // 重ねても何も起きず、売れる
+  assert.strictEqual(Core.merge(Core.WEED_ID, Core.WEED_ID), null);
+  Core.SPECIES.forEach((sp) => { if (sp.id !== Core.WEED_ID) assert.strictEqual(Core.merge(Core.WEED_ID, sp.id), null, `雑草と ${sp.name}`); });
+  const g = Core.createGame();
+  Core.place(g, 0, Core.WEED_ID);
+  assert.ok(Core.sell(g, 0) > 0, '売れる');
+  assert.ok(g.discovered[Core.WEED_ID], '図鑑には残る');
 });
 
 test('特殊合成のヒントは、材料を見つけるほど具体的になる', () => {
@@ -337,7 +368,7 @@ test('特殊合成のヒントは、材料を見つけるほど具体的にな�
   Core.place(g, 1, id('ハコベ'));
   assert.strictEqual(Core.hint(g, id('ホトケノザ')), '「三つ葉」と「ハコベ」を重ねてみよう。');
   // 出どころが決まっていない草は、そう言う
-  assert.ok(Core.hint(g, id('雑草')).includes('分かっていない'));
+  assert.strictEqual(Core.hint(g, id('雑草')), '種をまくと、ときどき生えてくる。');
 });
 
 test('どの草のヒントも空でなく、どんな状態でも答えの名前を出さない', () => {

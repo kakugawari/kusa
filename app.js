@@ -10,7 +10,7 @@
 
   const C = window.Core;
   const SAVE_KEY = 'kusa.save.v1';
-  const VERSION = '2026-10-04d'; // 直したら上げる。実機で「届いているか」を確かめるため、図鑑のいちばん下に出す
+  const VERSION = '2026-10-04e'; // 直したら上げる。実機で「届いているか」を確かめるため、図鑑のいちばん下に出す
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -456,7 +456,7 @@
     saveSoon();
     render();
     const id = game.cells[i];
-    say(C.speciesOf(id).name + 'が生えた。');
+    say(id === C.WEED_ID ? '雑草が生えた。重ねられないので、売って片づけよう。' : C.speciesOf(id).name + 'が生えた。');
     const shown = Promise.all([grow(i), dirt(baseOf(i), 5)]);
     if (before[id]) return shown;
     return run(async () => { await shown; await showDiscover(id, false); });

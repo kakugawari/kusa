@@ -127,6 +127,11 @@
    * 解放の条件は、どれも「系統の同じ段まで育てる」形にそろえてある (hint がそう読んで文にする)。
    */
   const START_SEEDS = ['chibi_shiba', 'mitsuba', 'hakobe'];
+  // 雑草: 種まきのとき、ときどき種のかわりに生える。重ねても何も起きず、売って片づけるだけの草。
+  // 図鑑に 3 種載るまでは出さない (最初の 1 本が雑草だと、はじめの驚きが無くなる)
+  const WEED_ID = 'zassou';
+  const WEED_RATE = 0.1;
+  const WEED_AFTER = 3;
   const SEED_UNLOCKS = [
     { id: 'tanpopo_me', need: ['konmori_shiba'] },                         // 芝生を 3 段目まで
     { id: 'susuki_me', need: ['itsuba'] },                                  // クローバーを 3 段目まで
@@ -300,6 +305,7 @@
 
   /**
    * 種をまく (試作品では無料)。解放済みの Lv.1 の草を、空きマスのどこかに1つ生やす。
+   * ときどき (WEED_RATE) 種のかわりに雑草が生える (図鑑に WEED_AFTER 種載ってから)。
    * 生えたマスの番号を返す。空きが無ければ -1。rng を渡せば結果を再現できる。
    */
   function plant(game, rng) {
@@ -307,8 +313,13 @@
     const empty = [];
     game.cells.forEach(function (c, i) { if (c === null) empty.push(i); });
     if (!empty.length) return -1;
-    const seeds = unlockedSpecies(game).filter(function (id) { return BY_ID[id].level === 1; });
     const index = empty[Math.floor(random() * empty.length)];
+    const weedRoll = random();
+    if (weedRoll < WEED_RATE && Object.keys(game.discovered).length >= WEED_AFTER) {
+      place(game, index, WEED_ID);
+      return index;
+    }
+    const seeds = unlockedSpecies(game).filter(function (id) { return BY_ID[id].level === 1; });
     place(game, index, seeds[Math.floor(random() * seeds.length)]);
     return index;
   }
@@ -337,6 +348,7 @@
       return '「' + best.name + '」から、あと' + (s.level - best.level) + '段階育てた先にいる。';
     }
     if (START_SEEDS.indexOf(id) >= 0) return '種をまくと生えてくる。';
+    if (id === WEED_ID) return '種をまくと、ときどき生えてくる。';
     const rule = SEED_UNLOCKS.filter(function (u) { return u.id === id; })[0];
     if (rule) {
       if (unlockedSpecies(game).indexOf(id) >= 0) return '種をまくと生えてくる。';
@@ -399,7 +411,7 @@
   return {
     RARITIES: RARITIES, LINEAGES: LINEAGES, SPECIES: SPECIES, RECIPES: RECIPES, FIELD_STEPS: FIELD_STEPS,
     findByName: findByName, merge: merge, createGame: createGame, fieldSize: fieldSize,
-    unlockedSpecies: unlockedSpecies, seedLabel: seedLabel, START_SEEDS: START_SEEDS, SEED_UNLOCKS: SEED_UNLOCKS, price: price, sellPrice: sellPrice, sell: sell, buySeed: buySeed, expand: expand, LAND_PRICE: LAND_PRICE, place: place, drop: drop, collection: collection,
+    unlockedSpecies: unlockedSpecies, WEED_ID: WEED_ID, WEED_RATE: WEED_RATE, WEED_AFTER: WEED_AFTER, seedLabel: seedLabel, START_SEEDS: START_SEEDS, SEED_UNLOCKS: SEED_UNLOCKS, price: price, sellPrice: sellPrice, sell: sell, buySeed: buySeed, expand: expand, LAND_PRICE: LAND_PRICE, place: place, drop: drop, collection: collection,
     move: move, plant: plant, number: number, speciesOf: speciesOf, hint: hint, save: save, load: load, RARITY_NAMES: RARITIES,
     mulberry32: mulberry32,
     shuffle: shuffle,
