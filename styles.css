@@ -128,7 +128,7 @@ html, body { height: 100vh; position: relative; }
 #field {
   position: fixed;
   inset: 0;
-  background: #4a3a24 url("./img/ground-dim.webp") center / cover no-repeat;
+  background: #4a3a24 url("./img/ground-soil.webp") center / cover no-repeat;
   pointer-events: none;
 }
 #field::after {
