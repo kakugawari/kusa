@@ -110,15 +110,28 @@
   ];
 
   /**
-   * 牧場の広がり。最初は狭く。
-   * 第3牧場の「水辺や岩場」と、幻想の牧場の大きさ・解放する草は仮 (写真は「水辺や岩場などの環境を追加」
-   * 「夜・月・星に関係する伝説の草を解放」までしか書いていない)。
+   * 牧場の広がり (マスの数)。最初は狭く。土地を広げる画面はまだ無い。
+   * 新しい草の解放は、土地ではなく図鑑の発見で決める (下の SEED_UNLOCKS)。
+   * 第3牧場の「水辺や岩場」と、幻想の牧場の大きさは仮。
    */
   const FIELD_STEPS = [
-    { name: '初期牧場', size: 4, unlock: ['ちび芝生', '三つ葉', 'ハコベ'], env: [] },
-    { name: '第2牧場', size: 6, unlock: ['芽', 'タンポポ', 'ススキ'], env: [] },
-    { name: '第3牧場', size: 8, unlock: ['水辺の草'], env: ['水辺', '岩場'] },
-    { name: '幻想の牧場', size: 8, unlock: ['光る草'], env: ['夜', '月', '星'] }
+    { name: '初期牧場', size: 4, env: [] },
+    { name: '第2牧場', size: 6, env: [] },
+    { name: '第3牧場', size: 8, env: ['水辺', '岩場'] },
+    { name: '幻想の牧場', size: 8, env: ['夜', '月', '星'] }
+  ];
+
+  /**
+   * 種として生える草 (Lv.1)。最初から出るもの / 図鑑で「これを見つけたら」増えるもの。
+   * 解放は発見の記録から毎回計算する。記録は売っても消えないので、一度開いたら閉じない。
+   * 解放の条件は、どれも「系統の同じ段まで育てる」形にそろえてある (hint がそう読んで文にする)。
+   */
+  const START_SEEDS = ['chibi_shiba', 'mitsuba', 'hakobe'];
+  const SEED_UNLOCKS = [
+    { id: 'tanpopo_me', need: ['konmori_shiba'] },                         // 芝生を 3 段目まで
+    { id: 'susuki_me', need: ['itsuba'] },                                  // クローバーを 3 段目まで
+    { id: 'mizube_kusa', need: ['sumire'] },                                // 野の花を 3 段目まで
+    { id: 'hikaru_kusa', need: ['ougon_shiba', 'kouun_clover', 'wasurenagusa'] } // 3 系統を最後まで
   ];
 
   // ---- コイン (値段はすべて仮) ----------------------------------------
@@ -190,15 +203,20 @@
 
   function fieldSize(game) { return FIELD_STEPS[game.step].size; }
 
+  /** いま種として出る草 (id の並び)。発見の記録から計算する。 */
   function unlockedSpecies(game) {
-    const names = [];
-    for (let i = 0; i <= game.step; i++) FIELD_STEPS[i].unlock.forEach(function (n) { names.push(n); });
-    const ids = [];
-    names.forEach(function (n) {
-      // 芽 は 2 系統あるので、名前に合う草をすべて出す
-      SPECIES.forEach(function (s) { if (s.name === n && ids.indexOf(s.id) < 0) ids.push(s.id); });
+    const ids = START_SEEDS.slice();
+    SEED_UNLOCKS.forEach(function (u) {
+      if (u.need.every(function (n) { return game.discovered[n]; })) ids.push(u.id);
     });
     return ids;
+  }
+
+  /** 種の呼び名。芽は 2 系統あるので、系統の名前を付ける (タンポポの芽)。 */
+  function seedLabel(id) {
+    const s = BY_ID[id];
+    if (s.name !== '芽') return s.name;
+    return LINEAGES.filter(function (l) { return l.id === s.lineage; })[0].name + 'の芽';
   }
 
   function discover(game, id) {
@@ -300,19 +318,11 @@
 
   function speciesOf(id) { return BY_ID[id] || null; }
 
-  /** その草が種から生えるようになる牧場の番号 (どの牧場にも無ければ -1)。 */
-  function unlockStep(id) {
-    for (let i = 0; i < FIELD_STEPS.length; i++) {
-      if (FIELD_STEPS[i].unlock.indexOf(BY_ID[id].name) >= 0) return i;
-    }
-    return -1;
-  }
-
   /**
    * 未発見の草に出すヒント。答え (その草の名前) は出さない。
    * 手がかりは、いま分かっていることに合わせて具体的になる:
    *   系統の草: ひとつ前を見つけていれば「それを2つ重ねる」。まだなら、いちばん進んだ草から「あと何段階」
-   *   最初の草: 種から生えるか、牧場を広げないと生えないか
+   *   最初の草: 種から生えるか、図鑑でどこまで進めると種に加わるか
    *   特殊合成: 材料を1つ見つければ「その草と、もう1種」、両方見つければ組み合わせそのもの
    */
   function hint(game, id) {
@@ -326,9 +336,18 @@
       chain.forEach(function (p) { if (p.level < s.level && game.discovered[p.id]) best = p; });
       return '「' + best.name + '」から、あと' + (s.level - best.level) + '段階育てた先にいる。';
     }
-    const step = unlockStep(id);
-    if (step >= 0) {
-      return step <= game.step ? '種をまくと生えてくる。' : '牧場を「' + FIELD_STEPS[step].name + '」に広げると、種から生えてくる。';
+    if (START_SEEDS.indexOf(id) >= 0) return '種をまくと生えてくる。';
+    const rule = SEED_UNLOCKS.filter(function (u) { return u.id === id; })[0];
+    if (rule) {
+      if (unlockedSpecies(game).indexOf(id) >= 0) return '種をまくと生えてくる。';
+      const needs = rule.need.map(function (n) { return BY_ID[n]; });
+      const done = needs.filter(function (n) { return game.discovered[n.id]; }).length;
+      const lineageName = function (n) { return LINEAGES.filter(function (l) { return l.id === n.lineage; })[0].name; };
+      const sameLevel = needs.every(function (n) { return n.level === needs[0].level; });
+      const what = sameLevel
+        ? needs.map(lineageName).join('・') + 'の系統を' + needs[0].level + '段目まで育てる'
+        : needs.map(function (n) { return '「' + n.name + '」'; }).join('') + 'を見つける';
+      return what + 'と、種に加わる' + (needs.length > 1 ? '（' + done + '/' + needs.length + '）' : '') + '。';
     }
     for (let i = 0; i < RECIPES.length; i++) {
       if (RECIPES[i][2] !== s.name) continue;
@@ -380,7 +399,7 @@
   return {
     RARITIES: RARITIES, LINEAGES: LINEAGES, SPECIES: SPECIES, RECIPES: RECIPES, FIELD_STEPS: FIELD_STEPS,
     findByName: findByName, merge: merge, createGame: createGame, fieldSize: fieldSize,
-    unlockedSpecies: unlockedSpecies, price: price, sellPrice: sellPrice, sell: sell, buySeed: buySeed, expand: expand, LAND_PRICE: LAND_PRICE, place: place, drop: drop, collection: collection,
+    unlockedSpecies: unlockedSpecies, seedLabel: seedLabel, START_SEEDS: START_SEEDS, SEED_UNLOCKS: SEED_UNLOCKS, price: price, sellPrice: sellPrice, sell: sell, buySeed: buySeed, expand: expand, LAND_PRICE: LAND_PRICE, place: place, drop: drop, collection: collection,
     move: move, plant: plant, number: number, speciesOf: speciesOf, hint: hint, save: save, load: load, RARITY_NAMES: RARITIES,
     mulberry32: mulberry32,
     shuffle: shuffle,

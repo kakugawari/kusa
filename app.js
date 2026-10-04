@@ -10,13 +10,13 @@
 
   const C = window.Core;
   const SAVE_KEY = 'kusa.save.v1';
-  const VERSION = '2026-10-04c'; // 直したら上げる。実機で「届いているか」を確かめるため、図鑑のいちばん下に出す
+  const VERSION = '2026-10-04d'; // 直したら上げる。実機で「届いているか」を確かめるため、図鑑のいちばん下に出す
 
   const $ = (id) => document.getElementById(id);
   const els = {
     board: $('board'), plants: $('plants'), stage: $('stage'), message: $('message'), coins: $('coins'), bookCount: $('bookCount'), bookMeter: $('bookMeter'),
     btnPlant: $('btnPlant'), btnSell: $('btnSell'), btnBook: $('btnBook'),
-    discover: $('discover'), discoverArt: $('discoverArt'), discoverNo: $('discoverNo'),
+    discover: $('discover'), discoverArt: $('discoverArt'), discoverNo: $('discoverNo'), discoverUnlock: $('discoverUnlock'),
     discoverName: $('discoverName'), discoverRarity: $('discoverRarity'), discoverKicker: $('discoverKicker'),
     book: $('book'), bookList: $('bookList'), bookCount2: $('bookCount2'), btnBookClose: $('btnBookClose'),
     zoom: $('zoom'), zoomArt: $('zoomArt'), zoomNo: $('zoomNo'), zoomName: $('zoomName'),
@@ -24,6 +24,7 @@
   };
 
   let game = loadGame();
+  let knownSeeds = new Set(C.unlockedSpecies(game)); // 種として出る草。増えたら発見の札で知らせる
   let selected = -1;      // タップで選んでいるマス
   let busy = false;       // 演出の最中は操作を受けない
   let group = 'lineage';  // 図鑑の並べ方
@@ -346,6 +347,12 @@
       drawArt(els.discoverArt, id);
       els.discoverKicker.textContent = special ? '特殊合成で発見！' : '発見！';
       els.discoverNo.textContent = 'No.' + pad(C.number(id));
+      // 図鑑に載ったことで新しい種が加わったら、札で知らせる
+      const nowSeeds = C.unlockedSpecies(game);
+      const fresh = nowSeeds.filter((x) => !knownSeeds.has(x));
+      knownSeeds = new Set(nowSeeds);
+      els.discoverUnlock.hidden = fresh.length === 0;
+      els.discoverUnlock.textContent = fresh.length ? '新しい種が加わった：' + fresh.map(C.seedLabel).join('・') : '';
       els.discoverName.textContent = s.name;
       setRarity(els.discoverRarity, s.rarity);
       els.discover.classList.toggle('special', !!special);
@@ -760,7 +767,7 @@
       game: () => game,
       busy: () => busy,
       selected: () => selected,
-      setGame: (g) => { game = g; selected = -1; buildBoard(); render(); },
+      setGame: (g) => { game = g; knownSeeds = new Set(C.unlockedSpecies(game)); selected = -1; buildBoard(); render(); },
       saveNow: saveNow,
       SAVE_KEY: SAVE_KEY
     };

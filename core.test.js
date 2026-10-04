@@ -171,7 +171,7 @@ test('種は、解放済みで、コインが足りて、空きがあるとき�
   assert.strictEqual(g.cells[1], null);
 });
 
-test('土地を広げても、草は同じ位置に残り、新しい草が解放される', () => {
+test('土地を広げても、草は同じ位置に残り、新しい草は解放されない (解放は図鑑の発見で決まる)', () => {
   const g = Core.createGame();
   Core.place(g, 5, id('ちび芝生')); // 4x4 の 1 行 1 列
   g.coins = Core.LAND_PRICE[1];
@@ -181,7 +181,7 @@ test('土地を広げても、草は同じ位置に残り、新しい草が解�
   assert.strictEqual(g.cells[1 * 6 + 1], id('ちび芝生'));
   assert.strictEqual(g.cells.filter((c) => c !== null).length, 1);
   assert.strictEqual(g.coins, 0);
-  assert.ok(Core.unlockedSpecies(g).indexOf(id('ススキ')) >= 0);
+  assert.deepStrictEqual(Core.unlockedSpecies(g), Core.unlockedSpecies(Core.createGame()), '土地では解放されない');
 });
 
 test('コインが足りないと土地は広がらない。最後の牧場より先は無い', () => {
@@ -259,18 +259,73 @@ test('ヒントは答えの名前を出さず、いま分かっていること�
   assert.ok(Core.hint(g, id('黄金芝生')).includes('「ふさふさ芝生」から、あと2段階'), Core.hint(g, id('黄金芝生')));
 });
 
-test('最初の草のヒントは、種から生えるか、牧場を広げないと生えないかを正しく言う', () => {
+test('最初の草のヒントは、種から生えるか、図鑑で何を見つけると加わるかを正しく言う', () => {
   const g = Core.createGame();
   ['ちび芝生', '三つ葉', 'ハコベ'].forEach((n) => assert.strictEqual(Core.hint(g, id(n)), '種をまくと生えてくる。', n));
   // 最初は生えない草に「種をまくと生える」と言ってはいけない (前は言っていた)
   const locked = Core.SPECIES.filter((s) => s.level === 1 && !Core.unlockedSpecies(g).includes(s.id) && !Core.RECIPES.some((r) => r[2] === s.name) && s.name !== '雑草');
-  assert.ok(locked.length >= 4, '芽 2 つ・水辺の草・光る草');
+  assert.strictEqual(locked.length, 4, '芽 2 つ・水辺の草・光る草');
   locked.forEach((s) => assert.ok(!Core.hint(g, s.id).includes('種をまくと'), `${s.name}: ${Core.hint(g, s.id)}`));
-  assert.ok(Core.hint(g, id('光る草')).includes('幻想の牧場'));
-  assert.ok(Core.hint(g, id('水辺の草')).includes('第3牧場'));
-  // 広げたあとは、種をまくと生える
-  g.step = 1;
-  assert.strictEqual(Core.hint(g, Core.SPECIES.filter((s) => s.name === '芽')[0].id), '種をまくと生えてくる。');
+  assert.ok(Core.hint(g, 'tanpopo_me').includes('芝生の系統を3段目'), Core.hint(g, 'tanpopo_me'));
+  assert.ok(Core.hint(g, 'susuki_me').includes('クローバーの系統を3段目'));
+  assert.ok(Core.hint(g, 'mizube_kusa').includes('野の花の系統を3段目'));
+  assert.ok(Core.hint(g, 'hikaru_kusa').includes('（0/3）'));
+  g.discovered.ougon_shiba = true;
+  assert.ok(Core.hint(g, 'hikaru_kusa').includes('（1/3）'));
+  // 解放されたあとは、種をまくと生える
+  g.discovered.konmori_shiba = true;
+  assert.strictEqual(Core.hint(g, 'tanpopo_me'), '種をまくと生えてくる。');
+});
+
+test('新しい種は図鑑の発見で加わり、売っても閉じない。保存して戻しても同じ', () => {
+  const g = Core.createGame();
+  const start = Core.unlockedSpecies(g);
+  assert.deepStrictEqual(start, [id('ちび芝生'), id('三つ葉'), id('ハコベ')]);
+  // 条件ごとに、ちょうどその草が加わる
+  [['konmori_shiba', 'tanpopo_me'], ['itsuba', 'susuki_me'], ['sumire', 'mizube_kusa']].forEach(([found, seed]) => {
+    const h = Core.createGame();
+    assert.ok(!Core.unlockedSpecies(h).includes(seed), `${seed} は最初は出ない`);
+    h.discovered[found] = true;
+    assert.ok(Core.unlockedSpecies(h).includes(seed), `${found} を見つけると ${seed} が加わる`);
+    assert.strictEqual(Core.unlockedSpecies(h).length, 4, '他は加わらない');
+  });
+  // 光る草は 3 系統の最後がそろってから
+  const h = Core.createGame();
+  ['ougon_shiba', 'kouun_clover'].forEach((n) => { h.discovered[n] = true; });
+  assert.ok(!Core.unlockedSpecies(h).includes('hikaru_kusa'));
+  h.discovered.wasurenagusa = true;
+  assert.ok(Core.unlockedSpecies(h).includes('hikaru_kusa'));
+  // 売っても (記録が残るので) 閉じない。保存して戻しても同じ
+  Core.place(h, 0, 'wasurenagusa');
+  Core.sell(h, 0);
+  assert.ok(Core.unlockedSpecies(h).includes('hikaru_kusa'), '売っても閉じない');
+  assert.deepStrictEqual(Core.unlockedSpecies(Core.load(Core.save(h))), Core.unlockedSpecies(h));
+  // 呼び名: 芽 は 2 系統あるので系統の名前を付ける
+  assert.strictEqual(Core.seedLabel('tanpopo_me'), 'タンポポの芽');
+  assert.strictEqual(Core.seedLabel('susuki_me'), 'ススキの芽');
+  assert.strictEqual(Core.seedLabel('chibi_shiba'), 'ちび芝生');
+});
+
+test('種に加わった草を使えば、雑草のほか 34 種すべてに、詰まらずたどり着ける', () => {
+  // 見つけた草だけで合成できるものを見つけ続け、解放された種も足していく。何度回しても進めば全部届く
+  const g = Core.createGame();
+  let progressed = true, rounds = 0;
+  while (progressed) {
+    progressed = false; rounds++;
+    const have = new Set(Core.unlockedSpecies(g));
+    let grew = true;
+    while (grew) {
+      grew = false;
+      [...have].forEach((a) => [...have].forEach((b) => {
+        const r = Core.merge(a, b);
+        if (r && !have.has(r.id)) { have.add(r.id); grew = true; }
+      }));
+    }
+    have.forEach((x) => { if (!g.discovered[x]) { g.discovered[x] = true; progressed = true; } });
+  }
+  const missing = Core.SPECIES.filter((s) => !g.discovered[s.id]).map((s) => s.name);
+  assert.deepStrictEqual(missing, ['雑草'], `たどり着けない草: ${missing.join(' ')}`);
+  assert.ok(rounds >= 3 && rounds <= 8, `解放が段になって進む (${rounds} 回)`);
 });
 
 test('特殊合成のヒントは、材料を見つけるほど具体的になる', () => {

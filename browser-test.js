@@ -208,6 +208,44 @@ async function run() {
     await closeDiscover();
     ok((await phone.locator('#bookCount').textContent()).startsWith('1 /'), '図鑑の数が 1 になる');
 
+    section('新しい種が加わる');
+    // ふさふさ芝生を 2 つ重ねて、こんもり芝生を初めて見つける → タンポポの芽の種が加わる
+    await setup({ 0: 'fusafusa_shiba', 5: 'fusafusa_shiba' });
+    const seedsBefore = await phone.evaluate(() => window.Core.unlockedSpecies(window.__app.game()).length);
+    ok(!(await phone.evaluate(() => window.Core.unlockedSpecies(window.__app.game()).includes('tanpopo_me'))), '最初はタンポポの芽は出ない');
+    await drag(cellSel(0), cellSel(5));
+    await phone.locator('#discover').waitFor({ state: 'visible' });
+    ok((await phone.locator('#discoverName').textContent()) === 'こんもり芝生', 'こんもり芝生を見つけた');
+    ok(await phone.locator('#discoverUnlock').isVisible(), '発見の札に「新しい種が加わった」が出る');
+    const unlockText = await phone.locator('#discoverUnlock').textContent();
+    ok(unlockText.includes('タンポポの芽'), `何の種かが分かる (${unlockText})`);
+    await closeDiscover();
+    ok((await phone.evaluate(() => window.Core.unlockedSpecies(window.__app.game()).length)) === seedsBefore + 1, '種が 1 つ増えた');
+    // 種をまくと、増えた種も生える (たくさんまいて、出ることを確かめる)
+    const sawTanpopo = await phone.evaluate(() => {
+      let seen = false;
+      for (let i = 0; i < 60 && !seen; i++) {
+        const g = window.Core.createGame();
+        for (const n of ['konmori_shiba']) g.discovered[n] = true;
+        Core.plant(g);
+        seen = g.cells.includes('tanpopo_me');
+      }
+      return seen;
+    });
+    ok(sawTanpopo, '解放した芽が、種まきで生える');
+    // 発見済みの草をもう一度見つけても、「新しい種」は出ない
+    await setup({ 0: 'fusafusa_shiba', 5: 'fusafusa_shiba' });
+    await phone.evaluate(() => { window.__app.game().discovered.konmori_shiba = true; });
+    await drag(cellSel(0), cellSel(5));
+    await idle();
+    ok(!(await phone.locator('#discover').isVisible()), '見つけ済みの草では、発見の札も新しい種の知らせも出ない');
+    // 新しく見つけても、それで増える種が無ければ出ない
+    await setup({ 0: chibi, 5: chibi });
+    await drag(cellSel(0), cellSel(5));
+    await phone.locator('#discover').waitFor({ state: 'visible' });
+    ok(!(await phone.locator('#discoverUnlock').isVisible()), '種が増えない発見では、知らせが出ない');
+    await closeDiscover();
+
     section('ドラッグで合成');
     await setup({ 0: chibi, 5: chibi });
     const boardBefore = await phone.locator('#board').boundingBox();
